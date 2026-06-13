@@ -638,7 +638,7 @@ const bindingSaving = ref(false);
 const bindingForm = ref({ type: 'kv_namespaces', name: '', value: '' });
 const bindingResources = ref<any[]>([]);
 const bindingResourcesLoading = ref(false);
-const r2Available = ref(true);
+const r2Available = ref(true);  // 恢复默认值
 const bindingTypeOptions = computed(() => {
   const options = [
     { label: 'KV 命名空间', value: 'kv_namespaces' },
@@ -686,7 +686,7 @@ async function buildResourceNameMap() {
     ];
     // Only fetch R2 if available
     if (r2Available.value) {
-      promises.push(workersApi.getR2Buckets(settingsAccountId.value).catch((err: any) => {
+      promises.push(workersApi.getR2Buckets(settingsAccountId.value, { _silent: true } as any).catch((err: any) => {
         const msg = err?.response?.data?.error?.message || err?.message || '';
         if (msg.includes('10042') || msg.includes('Please enable R2')) {
           r2Available.value = false;
@@ -750,7 +750,7 @@ async function loadBindingResources(type: string) {
     if (type === 'kv_namespaces') resp = await workersApi.getKvNamespaces(settingsAccountId.value);
     else if (type === 'd1_databases') resp = await workersApi.getD1Databases(settingsAccountId.value);
     else if (type === 'r2_buckets') {
-      resp = await workersApi.getR2Buckets(settingsAccountId.value);
+      resp = await workersApi.getR2Buckets(settingsAccountId.value, { _silent: true } as any);
     }
     bindingResources.value = Array.isArray(resp?.data) ? resp.data : [];
   } catch (err: any) {
@@ -893,7 +893,22 @@ async function openSettings(row: any) {
     loadPagesProject();
     loadPagesDomains();
     loadPagesDeployments();
-    loadBindings();
+    // Check R2 availability before loading bindings
+    checkR2Availability();
+  }
+}
+
+async function checkR2Availability() {
+  try {
+    await workersApi.getR2Buckets(settingsAccountId.value);
+    r2Available.value = true;
+  } catch (err: any) {
+    const msg = err?.response?.data?.error?.message || err?.message || '';
+    if (msg.includes('10042') || msg.includes('Please enable R2')) {
+      r2Available.value = false;
+    } else {
+      r2Available.value = true;  // 其他错误默认可用
+    }
   }
 }
 
