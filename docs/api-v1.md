@@ -257,7 +257,6 @@ POST /v1/browser/render
 > - `browserMsUsed`：Cloudflare 浏览器实际渲染耗时（毫秒），用于配额计费
 > - `screenshot` 和 `pdf` 返回 Data URL 格式，可直接用于 `<img>` 标签或下载
 > - Data URL 前缀包含 MIME 类型，方便前端直接使用
-```
 
 **错误响应：**
 
