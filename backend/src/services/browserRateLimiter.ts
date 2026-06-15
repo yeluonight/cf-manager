@@ -1,6 +1,4 @@
 import { getActiveAccounts, Account } from '../models/account';
-import { getAccountQuota } from './quotaTracker';
-import { setQuota } from '../models/quotaUsage';
 import { clearCache } from './accountRouter';
 
 const TOKEN_INTERVAL_MS = 10_000;
@@ -30,9 +28,8 @@ function ensureBuckets(): void {
 export function markAccountExhausted(accountId: number): void {
   const bucket = buckets.get(accountId);
   if (bucket) bucket.exhausted = true;
-  setQuota(accountId, 'browser_render_seconds', 600);
   clearCache();
-  console.log(`[BrowserRL] Account ${accountId} marked as exhausted`);
+  console.log(`[BrowserRL] Account ${accountId} marked as exhausted (CF daily limit)`);
 }
 
 export type AcquireResult =
@@ -51,12 +48,6 @@ export function acquireToken(): AcquireResult {
   for (const account of accounts) {
     const bucket = buckets.get(account.id);
     if (!bucket || bucket.exhausted) continue;
-
-    const { remaining } = getAccountQuota(account.id, 'browser_render_seconds');
-    if (remaining <= 0) {
-      bucket.exhausted = true;
-      continue;
-    }
 
     hasAvailableAccount = true;
     const elapsed = now - bucket.lastUsedAt;
