@@ -51,13 +51,13 @@
         <n-button size="small" type="primary" @click="openTaskModal()">添加任务</n-button>
       </template>
       <n-spin :show="tasksLoading">
-        <n-data-table v-if="tasks.length" :columns="taskColumns" :data="tasks" :bordered="false" size="small" />
+        <n-data-table v-if="tasks.length" :columns="taskColumns" :data="tasks" :bordered="false" size="small" :scroll-x="600" />
         <n-empty v-else-if="!tasksLoading" description="暂无定时任务" />
       </n-spin>
     </n-card>
 
     <!-- 添加/编辑任务 Modal -->
-    <n-modal v-model:show="showTaskModal" preset="dialog" :title="editingTaskId ? '编辑任务' : '添加任务'" style="width: 550px">
+    <n-modal v-model:show="showTaskModal" preset="dialog" :title="editingTaskId ? '编辑任务' : '添加任务'" style="width: 550px; max-width: 95vw">
       <n-form label-placement="left" label-width="100">
         <n-form-item label="任务名称">
           <n-input v-model:value="taskForm.name" placeholder="例如: 每日配额报告" />
@@ -116,7 +116,7 @@
     </n-modal>
 
     <!-- 执行历史 Drawer -->
-    <n-drawer v-model:show="showHistoryDrawer" :width="520" placement="right">
+    <n-drawer v-model:show="showHistoryDrawer" :width="drawerWidth(520)" placement="right">
       <n-drawer-content :title="`执行历史 - ${historyTaskName}`" closable>
         <n-spin :show="historyLoading">
           <n-timeline>
@@ -139,6 +139,10 @@ import apiClient from '../api/client';
 import { useAccountStore } from '../stores/accountStore';
 
 const message = useMessage();
+
+function drawerWidth(desktopWidth: number): number {
+  return window.innerWidth <= 768 ? Math.min(window.innerWidth, desktopWidth) : desktopWidth;
+}
 const accountStore = useAccountStore();
 const loading = ref(false);
 const clearing = ref(false);

@@ -1,10 +1,10 @@
 <template>
   <div>
-    <n-space justify="space-between" align="center">
-      <n-h2>Workers & Pages 管理</n-h2>
+    <n-space justify="space-between" align="center" :wrap="true">
+      <n-h2 style="margin: 0">Workers & Pages 管理</n-h2>
       <n-space>
-        <n-button @click="openBatchDeploy" :disabled="!workerStore.workers.length">批量部署</n-button>
-        <n-button type="primary" @click="openDeploy()" :disabled="!accountStore.accounts.length">部署</n-button>
+        <n-button size="small" @click="openBatchDeploy" :disabled="!workerStore.workers.length">批量部署</n-button>
+        <n-button size="small" type="primary" @click="openDeploy()" :disabled="!accountStore.accounts.length">部署</n-button>
       </n-space>
     </n-space>
 
@@ -41,10 +41,11 @@
       :data="workerStore.workers"
       :loading="workerStore.loading"
       :bordered="false"
+      :scroll-x="700"
     />
 
     <!-- 部署 Modal -->
-    <n-modal v-model:show="showDeployModal" preset="dialog" title="部署" style="width: 500px">
+    <n-modal v-model:show="showDeployModal" preset="dialog" title="部署" style="width: 500px; max-width: 95vw">
       <n-form :model="deployForm" label-placement="left" label-width="100">
         <n-form-item label="部署类型">
           <n-radio-group v-model:value="deployType">
@@ -89,7 +90,7 @@
     </n-modal>
 
     <!-- 日志 Drawer -->
-    <n-drawer v-model:show="showLogDrawer" :width="520" placement="right">
+    <n-drawer v-model:show="showLogDrawer" :width="drawerWidth(520)" placement="right">
       <n-drawer-content :title="`日志 - ${currentWorkerName}`" closable>
         <n-code :code="logContent" language="text" :word-wrap="true" />
         <n-empty v-if="!logContent && !logLoading" description="暂无日志" />
@@ -98,7 +99,7 @@
     </n-drawer>
 
     <!-- 设置 Drawer -->
-    <n-drawer v-model:show="showSettingsDrawer" :width="860" placement="right">
+    <n-drawer v-model:show="showSettingsDrawer" :width="drawerWidth(860)" placement="right">
       <n-drawer-content :title="`设置 - ${settingsWorkerName} (${settingsType})`" closable>
         <n-tabs type="line" animated>
           <!-- Worker-only tabs -->
@@ -114,7 +115,7 @@
                 </n-space>
               </n-space>
               <n-spin :show="secretsLoading">
-                <n-data-table :columns="secretColumns" :data="secrets" :bordered="false" size="small" />
+                <n-data-table :columns="secretColumns" :data="secrets" :bordered="false" size="small" :scroll-x="500" />
               </n-spin>
             </n-space>
           </n-tab-pane>
@@ -126,7 +127,7 @@
               <n-spin :show="schedulesLoading">
                 <n-dynamic-tags v-model:value="cronExpressions" />
                 <n-button size="small" type="primary" style="margin-top: 12px" :loading="schedulesSaving" @click="saveSchedules">保存</n-button>
-                <n-data-table v-if="schedules.length" :columns="scheduleColumns" :data="schedules" :bordered="false" size="small" style="margin-top: 12px" />
+                <n-data-table v-if="schedules.length" :columns="scheduleColumns" :data="schedules" :bordered="false" size="small" style="margin-top: 12px" :scroll-x="500" />
               </n-spin>
             </n-space>
           </n-tab-pane>
@@ -139,7 +140,7 @@
                 <n-button size="small" type="primary" @click="showDomainModal = true">添加域名</n-button>
               </n-space>
               <n-spin :show="domainsLoading">
-                <n-data-table :columns="domainColumns" :data="domains" :bordered="false" size="small" />
+                <n-data-table :columns="domainColumns" :data="domains" :bordered="false" size="small" :scroll-x="500" />
               </n-spin>
             </n-space>
           </n-tab-pane>
@@ -197,7 +198,7 @@
                 <n-button size="small" @click="showRouteModal = true">添加路由</n-button>
               </n-space>
               <n-spin :show="routesLoading">
-                <n-data-table :columns="routeColumns" :data="routes" :bordered="false" size="small" />
+                <n-data-table :columns="routeColumns" :data="routes" :bordered="false" size="small" :scroll-x="500" />
               </n-spin>
             </n-space>
           </n-tab-pane>
@@ -260,7 +261,7 @@
                 <n-button size="small" type="primary" @click="openPagesDomainModal">添加域名</n-button>
               </n-space>
               <n-spin :show="pagesDomainsLoading">
-                <n-data-table :columns="pagesDomainColumns" :data="pagesDomains" :bordered="false" size="small" />
+                <n-data-table :columns="pagesDomainColumns" :data="pagesDomains" :bordered="false" size="small" :scroll-x="500" />
               </n-spin>
             </n-space>
           </n-tab-pane>
@@ -273,7 +274,7 @@
                 <n-button size="small" type="primary" @click="pagesEnvEditing = false; pagesEnvForm = { name: '', value: '', type: 'plain_text' }; showPagesEnvModal = true">添加变量</n-button>
               </n-space>
               <n-spin :show="pagesProjectLoading">
-                <n-data-table :columns="pagesEnvColumns" :data="pagesEnvVars" :bordered="false" size="small" />
+                <n-data-table :columns="pagesEnvColumns" :data="pagesEnvVars" :bordered="false" size="small" :scroll-x="500" />
               </n-spin>
             </n-space>
           </n-tab-pane>
@@ -286,7 +287,7 @@
                 <n-button size="small" type="primary" @click="openBindingModal">添加绑定</n-button>
               </n-space>
               <n-spin :show="bindingsLoading">
-                <n-data-table :columns="bindingsColumns" :data="bindingsList" :bordered="false" size="small" />
+                <n-data-table :columns="bindingsColumns" :data="bindingsList" :bordered="false" size="small" :scroll-x="500" />
               </n-spin>
             </n-space>
           </n-tab-pane>
@@ -309,7 +310,7 @@
     </n-drawer>
 
     <!-- Secret Modal -->
-    <n-modal v-model:show="showSecretModal" preset="dialog" :title="secretEditing ? '编辑 Secret' : '添加 Secret'" style="width: 450px">
+    <n-modal v-model:show="showSecretModal" preset="dialog" :title="secretEditing ? '编辑 Secret' : '添加 Secret'" style="width: 450px; max-width: 95vw">
       <n-form :model="secretForm" label-placement="left" label-width="80">
         <n-form-item label="名称">
           <n-input v-model:value="secretForm.name" placeholder="环境变量名" :disabled="secretEditing" />
@@ -331,7 +332,7 @@
     </n-modal>
 
     <!-- Domain Modal -->
-    <n-modal v-model:show="showDomainModal" preset="dialog" title="添加自定义域名" style="width: 450px">
+    <n-modal v-model:show="showDomainModal" preset="dialog" title="添加自定义域名" style="width: 450px; max-width: 95vw">
       <n-form :model="domainForm" label-placement="left" label-width="80">
         <n-form-item label="域名">
           <n-input v-model:value="domainForm.hostname" placeholder="example.com" />
@@ -347,7 +348,7 @@
     </n-modal>
 
     <!-- Route Modal -->
-    <n-modal v-model:show="showRouteModal" preset="dialog" title="添加路由" style="width: 450px">
+    <n-modal v-model:show="showRouteModal" preset="dialog" title="添加路由" style="width: 450px; max-width: 95vw">
       <n-form :model="routeForm" label-placement="left" label-width="80">
         <n-form-item label="Zone ID">
           <n-input v-model:value="routeForm.zone_id" placeholder="Zone ID" />
@@ -363,7 +364,7 @@
     </n-modal>
 
     <!-- Pages Domain Modal -->
-    <n-modal v-model:show="showPagesDomainModal" preset="dialog" title="添加 Pages 域名" style="width: 450px">
+    <n-modal v-model:show="showPagesDomainModal" preset="dialog" title="添加 Pages 域名" style="width: 450px; max-width: 95vw">
       <n-form label-placement="left" label-width="80">
         <n-form-item label="域名">
           <n-select
@@ -383,7 +384,7 @@
     </n-modal>
 
     <!-- Pages Env Var Modal -->
-    <n-modal v-model:show="showPagesEnvModal" preset="dialog" :title="pagesEnvEditing ? '编辑 Pages 环境变量' : '添加 Pages 环境变量'" style="width: 450px">
+    <n-modal v-model:show="showPagesEnvModal" preset="dialog" :title="pagesEnvEditing ? '编辑 Pages 环境变量' : '添加 Pages 环境变量'" style="width: 450px; max-width: 95vw">
       <n-form :model="pagesEnvForm" label-placement="left" label-width="80">
         <n-form-item label="名称">
           <n-input v-model:value="pagesEnvForm.name" placeholder="环境变量名" :disabled="pagesEnvEditing" />
@@ -402,7 +403,7 @@
     </n-modal>
 
     <!-- Pages Binding Modal -->
-    <n-modal v-model:show="showBindingModal" preset="dialog" title="添加资源绑定" style="width: 500px">
+    <n-modal v-model:show="showBindingModal" preset="dialog" title="添加资源绑定" style="width: 500px; max-width: 95vw">
       <n-form :model="bindingForm" label-placement="left" label-width="80">
         <n-form-item label="类型">
           <n-select v-model:value="bindingForm.type" :options="bindingTypeOptions" @update:value="onBindingTypeChange" />
@@ -421,7 +422,7 @@
     </n-modal>
 
     <!-- 批量部署 Modal -->
-    <n-modal v-model:show="showBatchDeployModal" preset="dialog" title="批量部署" style="width: 650px">
+    <n-modal v-model:show="showBatchDeployModal" preset="dialog" title="批量部署" style="width: 650px; max-width: 95vw">
       <n-form label-placement="left" label-width="100">
         <n-form-item label="部署类型">
           <n-radio-group v-model:value="batchType" @update:value="batchTargets = []">
@@ -471,7 +472,7 @@
     </n-modal>
 
     <!-- 环境同步 Modal -->
-    <n-modal v-model:show="showEnvSyncModal" preset="dialog" title="同步 Secrets 到其他 Worker" style="width: 600px">
+    <n-modal v-model:show="showEnvSyncModal" preset="dialog" title="同步 Secrets 到其他 Worker" style="width: 600px; max-width: 95vw">
       <n-form label-placement="left" label-width="100">
         <n-form-item label="来源">
           <n-text>{{ settingsWorkerName }} ({{ settingsAccountId }})</n-text>
@@ -520,6 +521,10 @@ import { workersApi } from '../api/workers';
 const workerStore = useWorkerStore();
 const accountStore = useAccountStore();
 const message = useMessage();
+
+function drawerWidth(desktopWidth: number): number {
+  return window.innerWidth <= 768 ? Math.min(window.innerWidth, desktopWidth) : desktopWidth;
+}
 
 // ============ Workers Usage ============
 const usageData = ref<Array<{ accountId: number; accountName: string; requests: number; errors: number; subrequests: number; cpuTimeMs: number }>>([]);

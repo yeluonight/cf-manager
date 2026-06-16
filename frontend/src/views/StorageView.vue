@@ -3,14 +3,14 @@
     <n-h2>存储管理</n-h2>
     <n-space align="center" style="margin-bottom: 16px">
       <span>账号：</span>
-      <n-select v-model:value="selectedAccount" :options="accountOptions" style="width: 200px" size="small" @update:value="onAccountChange" />
+      <n-select v-model:value="selectedAccount" :options="accountOptions" style="width: 200px; max-width: 60vw" size="small" @update:value="onAccountChange" />
     </n-space>
 
     <n-tabs v-model:value="activeTab" type="line">
       <!-- ============ KV Tab ============ -->
       <n-tab-pane name="kv" tab="KV 存储">
-        <n-grid :cols="24" :x-gap="12">
-          <n-gi :span="6">
+        <n-grid :cols="24" :x-gap="12" :y-gap="12" responsive="screen" item-responsive>
+          <n-gi :span="24 m:6">
             <n-card title="命名空间" size="small">
               <template #header-extra>
                 <n-button size="tiny" type="primary" @click="handleCreateKvNs">新建</n-button>
@@ -29,7 +29,7 @@
               </n-spin>
             </n-card>
           </n-gi>
-          <n-gi :span="18">
+          <n-gi :span="24 m:18">
             <n-card :title="selectedKvNs ? `Keys - ${selectedKvNs.title || selectedKvNs.id}` : 'Keys'" size="small">
               <template #header-extra>
                 <n-space>
@@ -37,7 +37,7 @@
                   <n-button size="small" type="primary" @click="showKvEditor = true" :disabled="!selectedKvNs">新建</n-button>
                 </n-space>
               </template>
-              <n-data-table :columns="kvColumns" :data="kvKeys" :loading="kvKeysLoading" size="small" :bordered="false" />
+              <n-data-table :columns="kvColumns" :data="kvKeys" :loading="kvKeysLoading" size="small" :bordered="false" :scroll-x="500" />
               <n-space v-if="kvCursor" justify="center" style="margin-top: 12px">
                 <n-button size="small" @click="loadKvKeys(kvCursor)">加载更多</n-button>
               </n-space>
@@ -48,8 +48,8 @@
 
       <!-- ============ D1 Tab ============ -->
       <n-tab-pane name="d1" tab="D1 数据库">
-        <n-grid :cols="24" :x-gap="12">
-          <n-gi :span="6">
+        <n-grid :cols="24" :x-gap="12" :y-gap="12" responsive="screen" item-responsive>
+          <n-gi :span="24 m:6">
             <n-card title="数据库" size="small">
               <template #header-extra>
                 <n-button size="tiny" type="primary" @click="handleCreateD1Db">新建</n-button>
@@ -82,7 +82,7 @@
               <n-empty v-if="!d1Tables.length" description="暂无表" />
             </n-card>
           </n-gi>
-          <n-gi :span="18">
+          <n-gi :span="24 m:18">
             <n-card title="SQL 查询" size="small">
               <n-input v-model:value="d1Sql" type="textarea" :rows="4" placeholder="输入 SQL 查询..." style="margin-bottom: 12px; font-family: monospace;" />
               <n-space>
@@ -91,7 +91,7 @@
               </n-space>
               <div v-if="d1Result" style="margin-top: 16px">
                 <n-text depth="3" style="font-size: 12px">{{ d1Result.meta?.rows_read || 0 }} 行读取, {{ d1Result.meta?.rows_written || 0 }} 行写入, {{ d1Result.meta?.duration || 0 }}ms</n-text>
-                <n-data-table v-if="d1ResultColumns.length" :columns="d1ResultColumns" :data="d1Result.results || []" size="small" :bordered="false" style="margin-top: 8px" :max-height="400" virtual-scroll />
+                <n-data-table v-if="d1ResultColumns.length" :columns="d1ResultColumns" :data="d1Result.results || []" size="small" :bordered="false" style="margin-top: 8px" :max-height="400" virtual-scroll :scroll-x="600" />
               </div>
             </n-card>
           </n-gi>
@@ -100,8 +100,8 @@
 
       <!-- ============ R2 Tab ============ -->
       <n-tab-pane v-if="r2Available" name="r2" tab="R2 存储">
-        <n-grid :cols="24" :x-gap="12">
-          <n-gi :span="6">
+        <n-grid :cols="24" :x-gap="12" :y-gap="12" responsive="screen" item-responsive>
+          <n-gi :span="24 m:6">
             <n-card title="存储桶" size="small">
               <template #header-extra>
                 <n-button size="tiny" type="primary" @click="handleCreateR2Bucket">新建</n-button>
@@ -120,7 +120,7 @@
               </n-spin>
             </n-card>
           </n-gi>
-          <n-gi :span="18">
+          <n-gi :span="24 m:18">
             <n-card :title="selectedR2Bucket ? `文件 - ${selectedR2Bucket.name}` : '文件'" size="small">
               <template #header-extra>
                 <n-button size="small" type="primary" @click="showR2Upload = true" :disabled="!selectedR2Bucket">上传</n-button>
@@ -132,7 +132,7 @@
                   {{ part }}
                 </n-breadcrumb-item>
               </n-breadcrumb>
-              <n-data-table :columns="r2Columns" :data="r2DisplayItems" :loading="r2Loading" size="small" :bordered="false" />
+              <n-data-table :columns="r2Columns" :data="r2DisplayItems" :loading="r2Loading" size="small" :bordered="false" :scroll-x="600" />
             </n-card>
           </n-gi>
         </n-grid>
@@ -140,7 +140,7 @@
     </n-tabs>
 
     <!-- KV Editor Modal -->
-    <n-modal v-model:show="showKvEditor" preset="dialog" :title="kvEditKey ? '编辑 KV' : '新建 KV'" style="width: 600px">
+    <n-modal v-model:show="showKvEditor" preset="dialog" :title="kvEditKey ? '编辑 KV' : '新建 KV'" style="width: 600px; max-width: 95vw">
       <n-form label-placement="left" label-width="80">
         <n-form-item label="Key">
           <n-input v-model:value="kvEditForm.key" :disabled="!!kvEditKey" placeholder="key 名称" />
@@ -159,7 +159,7 @@
     </n-modal>
 
     <!-- R2 Upload Modal -->
-    <n-modal v-model:show="showR2Upload" preset="dialog" title="上传文件" style="width: 500px">
+    <n-modal v-model:show="showR2Upload" preset="dialog" title="上传文件" style="width: 500px; max-width: 95vw">
       <n-form label-placement="left" label-width="80">
         <n-form-item label="路径前缀">
           <n-input v-model:value="r2UploadPrefix" :placeholder="r2Prefix || '/'" />
@@ -177,7 +177,7 @@
     </n-modal>
 
     <!-- Create Resource Modal -->
-    <n-modal v-model:show="showCreateModal" preset="dialog" :title="createModalTitle" style="width: 450px">
+    <n-modal v-model:show="showCreateModal" preset="dialog" :title="createModalTitle" style="width: 450px; max-width: 95vw">
       <n-form label-placement="left" label-width="80">
         <n-form-item :label="createModalLabel">
           <n-input v-model:value="createModalName" :placeholder="createModalPlaceholder" @keyup.enter="handleCreateConfirm" />
@@ -190,8 +190,8 @@
     </n-modal>
 
     <!-- D1 Table Schema Modal -->
-    <n-modal v-model:show="showD1Schema" preset="card" :title="`表结构 - ${d1SchemaTable}`" style="width: 700px">
-      <n-data-table :columns="d1SchemaColumns" :data="d1SchemaData" :loading="d1SchemaLoading" size="small" :bordered="false" />
+    <n-modal v-model:show="showD1Schema" preset="card" :title="`表结构 - ${d1SchemaTable}`" style="width: 700px; max-width: 95vw">
+      <n-data-table :columns="d1SchemaColumns" :data="d1SchemaData" :loading="d1SchemaLoading" size="small" :bordered="false" :scroll-x="500" />
       <n-space style="margin-top: 16px">
         <n-button size="small" type="primary" @click="showD1AddColumn = true">添加列</n-button>
         <n-button size="small" type="warning" @click="showD1RenameColumn = true" :disabled="!d1SchemaData.length">重命名列</n-button>
@@ -232,13 +232,13 @@
     </n-modal>
 
     <!-- D1 Create Table Modal -->
-    <n-modal v-model:show="showD1CreateTable" preset="card" title="新建表" style="width: 700px">
+    <n-modal v-model:show="showD1CreateTable" preset="card" title="新建表" style="width: 700px; max-width: 95vw">
       <n-form label-placement="left" label-width="80">
         <n-form-item label="表名">
           <n-input v-model:value="d1NewTableName" placeholder="表名（字母、数字、下划线）" />
         </n-form-item>
       </n-form>
-      <n-data-table :columns="d1ColDefColumns" :data="d1NewTableCols" size="small" :bordered="false" style="margin-top: 8px" />
+      <n-data-table :columns="d1ColDefColumns" :data="d1NewTableCols" size="small" :bordered="false" style="margin-top: 8px" :scroll-x="500" />
       <n-space style="margin-top: 12px">
         <n-button size="small" @click="d1NewTableCols.push({ name: '', type: 'TEXT', primaryKey: false, notNull: false, defaultVal: '' })">添加列</n-button>
       </n-space>

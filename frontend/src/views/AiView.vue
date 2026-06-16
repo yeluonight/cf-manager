@@ -1,11 +1,11 @@
 <template>
-  <div style="display: flex; flex-direction: column; height: calc(100vh - 120px);">
+  <div class="ai-view-root">
     <!-- 聊天消息区域 -->
     <div ref="chatContainer" style="flex: 1; overflow-y: auto; padding: 20px;">
       <!-- 欢迎页 -->
       <div v-if="messages.length === 0" style="text-align: center; padding: 40px 20px 40px;">
         <!-- AI 用量统计 -->
-        <n-grid v-if="usageData.length > 0" :cols="Math.min(usageData.length, 5)" :x-gap="12" :y-gap="12" style="margin-bottom: 30px; text-align: left;">
+        <n-grid v-if="usageData.length > 0" :cols="aiGridCols" :x-gap="12" :y-gap="12" responsive="screen" style="margin-bottom: 30px; text-align: left;">
           <n-gi v-for="u in usageData" :key="u.accountId">
             <n-card size="small">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -92,21 +92,21 @@
     </div>
 
     <!-- 底部输入区域 -->
-    <div style="border-top: 1px solid #eee; padding: 12px 20px; background: white;">
+    <div class="ai-input-bar">
       <!-- 顶部工具栏 -->
-      <div style="margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+      <div class="ai-toolbar">
         <n-select
           v-model:value="selectedAccount"
           :options="accountOptions"
           placeholder="账户"
-          style="width: 180px;"
+          class="ai-select-account"
           size="small"
         />
         <n-select
           v-model:value="selectedModel"
           :options="modelOptions"
           placeholder="选择模型"
-          style="flex: 1;"
+          style="flex: 1; min-width: 0;"
           :loading="modelsLoading"
           size="small"
           filterable
@@ -137,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted, nextTick } from 'vue';
+import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue';
 import { useMessage, NProgress } from 'naive-ui';
 import { aiApi } from '../api/ai';
 import { accountsApi } from '../api/accounts';
@@ -150,6 +150,10 @@ interface AiUsageItem {
   expanded?: boolean;
 }
 const usageData = ref<AiUsageItem[]>([]);
+const aiGridCols = computed(() => {
+  const count = usageData.value.length;
+  return `1 s:${Math.min(count, 2)} m:${Math.min(count, 3)} l:${Math.min(count, 5)}`;
+});
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -367,3 +371,45 @@ watch(selectedAccount, () => {
   fetchModels();
 });
 </script>
+
+<style scoped>
+.ai-view-root {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+}
+
+.ai-input-bar {
+  border-top: 1px solid #eee;
+  padding: 12px 20px;
+  background: white;
+}
+
+.ai-toolbar {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ai-select-account {
+  width: 180px;
+}
+
+@media (max-width: 768px) {
+  .ai-view-root {
+    height: calc(100vh - 80px);
+  }
+  .ai-input-bar {
+    padding: 8px 12px;
+  }
+  .ai-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .ai-select-account {
+    width: 100%;
+  }
+}
+</style>

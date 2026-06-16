@@ -6,7 +6,7 @@
     </n-space>
 
     <n-spin :show="quotaStore.loading" style="margin-top: 16px">
-      <n-grid v-if="quotaWithResources.length > 0" :cols="Math.min(quotaWithResources.length, 5)" :x-gap="16" :y-gap="16">
+      <n-grid v-if="quotaWithResources.length > 0" :cols="gridCols" :x-gap="12" :y-gap="12" responsive="screen">
         <n-gi v-for="acct in quotaWithResources" :key="acct.accountId">
           <n-card :title="acct.accountName" size="small">
             <div v-for="r in acct.resources" :key="r.resource" style="margin-bottom: 14px;">
@@ -35,6 +35,7 @@
       :loading="loadingLogs"
       size="small"
       :bordered="false"
+      :scroll-x="700"
     />
   </div>
 </template>
@@ -49,6 +50,10 @@ const quotaStore = useQuotaStore();
 const quotaWithResources = computed(() =>
   quotaStore.quota.filter((acct: any) => acct.resources && acct.resources.length > 0)
 );
+const gridCols = computed(() => {
+  const count = quotaWithResources.value.length;
+  return `1 s:${Math.min(count, 2)} m:${Math.min(count, 3)} l:${Math.min(count, 5)}`;
+});
 const auditLogs = ref<any[]>([]);
 const loadingLogs = ref(false);
 

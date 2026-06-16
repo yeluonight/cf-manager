@@ -10,9 +10,10 @@
       :data="accountStore.accounts"
       :loading="accountStore.loading"
       :bordered="false"
+      :scroll-x="700"
     />
 
-    <n-modal v-model:show="showAddModal" preset="dialog" title="添加账号" style="width: 500px">
+    <n-modal v-model:show="showAddModal" preset="dialog" title="添加账号" style="width: 500px; max-width: 95vw">
       <n-form :model="form" label-placement="left" label-width="100">
         <n-form-item label="名称">
           <n-input v-model:value="form.name" placeholder="账号名称" />
@@ -43,7 +44,7 @@
       </template>
     </n-modal>
 
-    <n-modal v-model:show="showFeatureModal" preset="dialog" title="编辑功能开关" style="width: 400px">
+    <n-modal v-model:show="showFeatureModal" preset="dialog" title="编辑功能开关" style="width: 400px; max-width: 95vw">
       <n-checkbox-group v-model:value="editFeatures">
         <n-space vertical>
           <n-checkbox v-for="f in featureOptions" :key="f.value" :value="f.value" :label="f.label" />

@@ -10,8 +10,8 @@
             </div>
 
             <!-- 登录界面 -->
-            <div v-else-if="showLogin" style="display: flex; justify-content: center; align-items: center; height: 100vh">
-              <n-card title="CF Manager" style="width: 400px">
+            <div v-else-if="showLogin" style="display: flex; justify-content: center; align-items: center; height: 100vh; padding: 16px">
+              <n-card title="CF Manager" style="width: 400px; max-width: 100%">
                 <n-form @submit.prevent="handleLogin">
                   <n-form-item label="API Secret">
                     <n-input v-model:value="loginSecret" type="password" placeholder="输入 API Secret" show-password-on="click" @keyup.enter="handleLogin" />
@@ -21,7 +21,8 @@
               </n-card>
             </div>
 
-            <n-layout v-else has-sider style="height: 100vh">
+            <!-- Desktop Layout -->
+            <n-layout v-else-if="!isMobile" has-sider style="height: 100vh">
               <n-layout-sider bordered :width="220" :collapsed-width="64" collapse-mode="width" :collapsed="collapsed">
                 <div style="padding: 16px; text-align: center; font-weight: bold; font-size: 18px">
                   {{ collapsed ? 'CF' : 'CF Manager' }}
@@ -45,6 +46,62 @@
                 </n-layout-content>
               </n-layout>
             </n-layout>
+
+            <!-- Mobile Layout -->
+            <div v-else class="mobile-layout">
+              <div class="mobile-content">
+                <router-view />
+              </div>
+
+              <!-- FAB Overlay -->
+              <transition name="fab-overlay">
+                <div v-if="fabOpen" class="fab-overlay" @click="fabOpen = false" />
+              </transition>
+
+              <!-- FAB Panel -->
+              <transition name="fab-panel">
+                <div v-if="fabOpen" class="fab-panel" :class="{ 'fab-panel--dark': isDark }">
+                  <div class="fab-panel-header">
+                    <span class="fab-panel-title">CF Manager</span>
+                    <div class="fab-panel-actions">
+                      <n-button circle size="small" quaternary @click="toggleTheme">
+                        <template #icon><n-icon :component="isDark ? SunnyOutline : MoonOutline" :size="16" /></template>
+                      </n-button>
+                      <n-button circle size="small" quaternary type="error" @click="handleLogout">
+                        <template #icon><n-icon :component="LogOutOutline" :size="16" /></template>
+                      </n-button>
+                    </div>
+                  </div>
+                  <div class="fab-panel-body">
+                    <div class="fab-grid">
+                      <div
+                        v-for="item in navItems"
+                        :key="item.key"
+                        class="fab-item"
+                        :class="{ 'fab-item--active': activeMenuKey === item.key }"
+                        @click="handleMenuClick(item.key); fabOpen = false"
+                      >
+                        <n-icon :component="item.iconComponent" :size="22" />
+                        <span class="fab-item-label">{{ item.label }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </transition>
+
+              <!-- FAB Button -->
+              <div
+                class="fab-btn"
+                :class="{ 'fab-btn--open': fabOpen, 'fab-btn--dragging': fabDragging, 'fab-btn--dark': isDark }"
+                :style="fabStyle"
+                @click.prevent="onFabClick"
+                @touchstart.passive="onFabTouchStart"
+                @touchmove.prevent="onFabTouchMove"
+                @touchend.passive="onFabTouchEnd"
+              >
+                <n-icon :component="fabOpen ? CloseOutline : GridOutline" :size="24" />
+              </div>
+            </div>
           </n-loading-bar-provider>
         </n-notification-provider>
       </n-message-provider>
@@ -53,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, watch, onMounted } from 'vue';
+import { ref, reactive, computed, h, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { darkTheme } from 'naive-ui';
 import type { Component } from 'vue';
@@ -62,6 +119,7 @@ import {
   SpeedometerOutline, PeopleOutline, GlobeOutline, ConstructOutline,
   SparklesOutline, ImageOutline, SettingsOutline,
   MenuOutline, SunnyOutline, MoonOutline, ServerOutline,
+  CloseOutline, GridOutline, LogOutOutline,
 } from '@vicons/ionicons5';
 import apiClient from './api/client';
 import { message as globalMessage } from './utils/discreteApi';
@@ -79,7 +137,83 @@ const authChecking = ref(true);
 const loginSecret = ref('');
 const loginLoading = ref(false);
 
+const isMobile = ref(window.innerWidth <= 768);
+const fabOpen = ref(false);
+const fabDragging = ref(false);
+const fabPos = reactive({ x: -1, y: -1 });
+let dragStartX = 0, dragStartY = 0, dragStartPosX = 0, dragStartPosY = 0;
+let dragMoved = false;
+
+const fabStyle = computed(() => {
+  if (fabPos.x < 0) return {};
+  return { right: 'auto', bottom: 'auto', left: fabPos.x + 'px', top: fabPos.y + 'px' };
+});
+
+const navItems = [
+  { label: '仪表盘', key: 'dashboard', iconComponent: SpeedometerOutline },
+  { label: '账号', key: 'accounts', iconComponent: PeopleOutline },
+  { label: 'DNS', key: 'dns', iconComponent: GlobeOutline },
+  { label: 'Workers', key: 'workers', iconComponent: ConstructOutline },
+  { label: '存储', key: 'storage', iconComponent: ServerOutline },
+  { label: 'AI', key: 'ai', iconComponent: SparklesOutline },
+  { label: '渲染', key: 'browser-render', iconComponent: ImageOutline },
+  { label: '设置', key: 'settings', iconComponent: SettingsOutline },
+];
+
+function initFabPos() {
+  if (fabPos.x < 0) {
+    fabPos.x = window.innerWidth - 72;
+    fabPos.y = window.innerHeight - 72;
+  }
+}
+
+function clampFab() {
+  fabPos.x = Math.max(8, Math.min(window.innerWidth - 64, fabPos.x));
+  fabPos.y = Math.max(8, Math.min(window.innerHeight - 64, fabPos.y));
+}
+
+function snapToEdge() {
+  const center = fabPos.x + 28;
+  fabPos.x = center < window.innerWidth / 2 ? 12 : window.innerWidth - 68;
+}
+
+function onFabClick() {
+  if (dragMoved) return;
+  fabOpen.value = !fabOpen.value;
+}
+
+function onFabTouchStart(e: TouchEvent) {
+  const t = e.touches[0];
+  dragStartX = t.clientX; dragStartY = t.clientY;
+  dragStartPosX = fabPos.x; dragStartPosY = fabPos.y;
+  dragMoved = false;
+  fabDragging.value = true;
+}
+
+function onFabTouchMove(e: TouchEvent) {
+  if (!fabDragging.value) return;
+  const t = e.touches[0];
+  const dx = t.clientX - dragStartX, dy = t.clientY - dragStartY;
+  if (Math.abs(dx) > 5 || Math.abs(dy) > 5) dragMoved = true;
+  fabPos.x = dragStartPosX + dx;
+  fabPos.y = dragStartPosY + dy;
+  clampFab();
+}
+
+function onFabTouchEnd() {
+  fabDragging.value = false;
+  clampFab();
+  snapToEdge();
+}
+
+function onResize() {
+  isMobile.value = window.innerWidth <= 768;
+  if (isMobile.value && fabPos.x >= 0) clampFab();
+}
+
 onMounted(async () => {
+  initFabPos();
+  window.addEventListener('resize', onResize);
   window.addEventListener('auth-expired', () => {
     isAuthenticated.value = false;
     showLogin.value = true;
@@ -94,6 +228,10 @@ onMounted(async () => {
   } finally {
     authChecking.value = false;
   }
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize);
 });
 
 async function handleLogin() {
@@ -120,11 +258,8 @@ function handleLogout() {
   loginSecret.value = '';
 }
 
-// Sync menu key with route changes
 watch(() => route.name, (newName) => {
-  if (newName) {
-    activeMenuKey.value = newName as string;
-  }
+  if (newName) activeMenuKey.value = newName as string;
 });
 
 function renderIcon(icon: Component) {
@@ -150,3 +285,186 @@ function toggleTheme() {
   isDark.value = !isDark.value;
 }
 </script>
+
+<style scoped>
+/* Mobile Layout */
+.mobile-layout {
+  min-height: 100vh;
+}
+
+.mobile-content {
+  padding: 16px 12px 80px;
+}
+
+/* FAB Button */
+.fab-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #18a058;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1100;
+  box-shadow: 0 4px 16px rgba(24, 160, 88, 0.4);
+  transition: transform 0.2s ease, background 0.2s, box-shadow 0.2s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fab-btn:active { transform: scale(0.92); }
+.fab-btn--dragging { transition: none !important; transform: scale(1.08); opacity: 0.85; }
+
+.fab-btn--open {
+  background: #fff;
+  color: #333;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.fab-btn--open.fab-btn--dark {
+  background: #2c2c32;
+  color: #e0e0e0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* FAB Overlay */
+.fab-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 1090;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+/* FAB Panel */
+.fab-panel {
+  position: fixed;
+  bottom: 88px;
+  right: 16px;
+  width: calc(100vw - 32px);
+  max-width: 360px;
+  max-height: 70vh;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(230, 230, 230, 0.8);
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
+  z-index: 1095;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.fab-panel--dark {
+  background: rgba(36, 36, 40, 0.95);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+}
+
+.fab-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(230, 230, 230, 0.6);
+  flex-shrink: 0;
+}
+
+.fab-panel--dark .fab-panel-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.fab-panel-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fab-panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.fab-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+/* FAB Grid */
+.fab-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.fab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.fab-item:active {
+  transform: scale(0.95);
+}
+
+.fab-item:hover {
+  background: rgba(24, 160, 88, 0.06);
+}
+
+.fab-item--active {
+  background: rgba(24, 160, 88, 0.12);
+  color: #18a058;
+}
+
+.fab-panel--dark .fab-item:hover {
+  background: rgba(24, 160, 88, 0.12);
+}
+
+.fab-panel--dark .fab-item--active {
+  background: rgba(24, 160, 88, 0.2);
+}
+
+.fab-item-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Transitions */
+.fab-overlay-enter-active,
+.fab-overlay-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fab-overlay-enter-from,
+.fab-overlay-leave-to {
+  opacity: 0;
+}
+
+.fab-panel-enter-active {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
+}
+.fab-panel-leave-active {
+  transition: transform 0.2s ease, opacity 0.15s ease;
+}
+.fab-panel-enter-from {
+  transform: translateY(20px) scale(0.95);
+  opacity: 0;
+}
+.fab-panel-leave-to {
+  transform: translateY(10px) scale(0.97);
+  opacity: 0;
+}
+</style>

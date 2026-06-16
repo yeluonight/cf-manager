@@ -3,7 +3,7 @@
     <n-h2>浏览器渲染</n-h2>
 
     <!-- 用量统计 (按账户) -->
-    <n-grid v-if="usageList.length > 0" :cols="Math.min(usageList.length, 5)" :x-gap="12" :y-gap="12" style="margin-bottom: 16px;">
+    <n-grid v-if="usageList.length > 0" :cols="brGridCols" :x-gap="12" :y-gap="12" responsive="screen" style="margin-bottom: 16px;">
       <n-gi v-for="u in usageList" :key="u.accountId">
         <n-card size="small">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -27,18 +27,18 @@
 
     <n-card size="small" style="margin-bottom: 16px">
       <n-space vertical>
-        <n-space align="center">
+        <n-space align="center" :wrap="true">
           <n-select
             v-model:value="selectedAccount"
             :options="accountOptions"
             placeholder="账户"
-            style="width: 180px;"
+            style="width: 180px; max-width: 45vw;"
             size="small"
           />
           <n-input
             v-model:value="url"
-            placeholder="输入 URL，例如 https://example.com"
-            style="width: 400px"
+            placeholder="输入 URL"
+            style="width: 400px; max-width: 60vw"
             :disabled="rendering"
             @keyup.enter="handleRender"
           />
@@ -117,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useMessage, NProgress } from 'naive-ui';
 import { browserRenderApi, type RenderMode } from '../api/browserRender';
 import { accountsApi } from '../api/accounts';
@@ -128,6 +128,10 @@ const selectedAccount = ref<string>('auto');
 const accountOptions = ref<{ label: string; value: string }[]>([]);
 interface UsageItem { accountId: number; accountName: string; used: number; limit: number; }
 const usageList = ref<UsageItem[]>([]);
+const brGridCols = computed(() => {
+  const count = usageList.value.length;
+  return `1 s:${Math.min(count, 2)} m:${Math.min(count, 3)} l:${Math.min(count, 5)}`;
+});
 const renderMode = ref<RenderMode>('screenshot');
 const rendering = ref(false);
 const htmlViewMode = ref<'render' | 'source'>('render');
