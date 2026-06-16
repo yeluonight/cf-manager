@@ -110,7 +110,7 @@
                 <n-text depth="3">环境变量和加密密钥</n-text>
                 <n-space>
                   <n-button size="small" @click="openEnvSync">同步到其他 Worker</n-button>
-                  <n-button size="small" type="primary" @click="showSecretModal = true">添加 Secret</n-button>
+                  <n-button size="small" type="primary" @click="secretEditing = false; secretForm = { name: '', type: 'secret_text', text: '', key_base64: '' }; showSecretModal = true">添加 Secret</n-button>
                 </n-space>
               </n-space>
               <n-spin :show="secretsLoading">
@@ -270,7 +270,7 @@
             <n-space vertical>
               <n-space justify="space-between">
                 <n-text depth="3">生产环境变量</n-text>
-                <n-button size="small" type="primary" @click="showPagesEnvModal = true">添加变量</n-button>
+                <n-button size="small" type="primary" @click="pagesEnvEditing = false; pagesEnvForm = { name: '', value: '', type: 'plain_text' }; showPagesEnvModal = true">添加变量</n-button>
               </n-space>
               <n-spin :show="pagesProjectLoading">
                 <n-data-table :columns="pagesEnvColumns" :data="pagesEnvVars" :bordered="false" size="small" />
@@ -309,10 +309,10 @@
     </n-drawer>
 
     <!-- Secret Modal -->
-    <n-modal v-model:show="showSecretModal" preset="dialog" title="添加 Secret" style="width: 450px">
+    <n-modal v-model:show="showSecretModal" preset="dialog" :title="secretEditing ? '编辑 Secret' : '添加 Secret'" style="width: 450px">
       <n-form :model="secretForm" label-placement="left" label-width="80">
         <n-form-item label="名称">
-          <n-input v-model:value="secretForm.name" placeholder="环境变量名" />
+          <n-input v-model:value="secretForm.name" placeholder="环境变量名" :disabled="secretEditing" />
         </n-form-item>
         <n-form-item label="类型">
           <n-select v-model:value="secretForm.type" :options="[{label:'Text',value:'secret_text'},{label:'Key',value:'secret_key'}]" />
@@ -383,10 +383,10 @@
     </n-modal>
 
     <!-- Pages Env Var Modal -->
-    <n-modal v-model:show="showPagesEnvModal" preset="dialog" title="添加 Pages 环境变量" style="width: 450px">
+    <n-modal v-model:show="showPagesEnvModal" preset="dialog" :title="pagesEnvEditing ? '编辑 Pages 环境变量' : '添加 Pages 环境变量'" style="width: 450px">
       <n-form :model="pagesEnvForm" label-placement="left" label-width="80">
         <n-form-item label="名称">
-          <n-input v-model:value="pagesEnvForm.name" placeholder="环境变量名" />
+          <n-input v-model:value="pagesEnvForm.name" placeholder="环境变量名" :disabled="pagesEnvEditing" />
         </n-form-item>
         <n-form-item label="值">
           <n-input v-model:value="pagesEnvForm.value" placeholder="变量值" />
@@ -572,6 +572,7 @@ const secrets = ref<any[]>([]);
 const secretsLoading = ref(false);
 const showSecretModal = ref(false);
 const secretSaving = ref(false);
+const secretEditing = ref(false);
 const secretForm = ref({ name: '', type: 'secret_text', text: '', key_base64: '' });
 
 // Schedules
@@ -627,6 +628,7 @@ const managedDomainOptions = computed(() =>
 );
 const pagesEnvVars = ref<any[]>([]);
 const showPagesEnvModal = ref(false);
+const pagesEnvEditing = ref(false);
 const pagesEnvForm = ref({ name: '', value: '', type: 'plain_text' });
 const pagesEnvSaving = ref(false);
 
@@ -950,6 +952,12 @@ async function handleAddSecret() {
   } finally { secretSaving.value = false; }
 }
 
+function handleEditSecret(row: any) {
+  secretEditing.value = true;
+  secretForm.value = { name: row.name, type: row.type || 'secret_text', text: '', key_base64: '' };
+  showSecretModal.value = true;
+}
+
 async function handleDeleteSecret(row: any) {
   await workersApi.deleteSecret(settingsAccountId.value, settingsWorkerName.value, row.name);
   message.success('Secret 已删除');
@@ -1157,11 +1165,36 @@ async function handleAddPagesEnv() {
         preview: { ...existingPreview, env_vars: envVars },
       },
     });
-    message.success('环境变量已添加');
+    message.success('环境变量已保存');
     showPagesEnvModal.value = false;
     pagesEnvForm.value = { name: '', value: '', type: 'plain_text' };
     loadPagesProject();
   } finally { pagesEnvSaving.value = false; }
+}
+
+function handleEditPagesEnv(row: any) {
+  pagesEnvEditing.value = true;
+  pagesEnvForm.value = { name: row.name, value: row.type === 'secret_text' ? '' : (row.value || ''), type: row.type || 'plain_text' };
+  showPagesEnvModal.value = true;
+}
+
+async function handleDeletePagesEnv(row: any) {
+  try {
+    const existingProd = pagesProject.value?.deployment_configs?.production || {};
+    const existingPreview = pagesProject.value?.deployment_configs?.preview || {};
+    const prodEnvVars = { ...(existingProd.env_vars || {}) };
+    const previewEnvVars = { ...(existingPreview.env_vars || {}) };
+    delete prodEnvVars[row.name];
+    delete previewEnvVars[row.name];
+    await workersApi.editPagesProject(settingsAccountId.value, settingsWorkerName.value, {
+      deployment_configs: {
+        production: { ...existingProd, env_vars: prodEnvVars },
+        preview: { ...existingPreview, env_vars: previewEnvVars },
+      },
+    });
+    message.success('环境变量已删除');
+    loadPagesProject();
+  } catch (e: any) { message.error(e?.message || '删除失败'); }
 }
 
 async function loadPagesDeployments() {
@@ -1205,7 +1238,12 @@ const columns = computed<DataTableColumns<any>>(() => {
 const secretColumns: DataTableColumns<any> = [
   { title: '名称', key: 'name' },
   { title: '类型', key: 'type', width: 120, render: (row) => h(NTag, { size: 'small' }, { default: () => row.type || 'unknown' }) },
-  { title: '操作', key: 'actions', width: 80, render: (row) => h(NButton, { size: 'tiny', type: 'error', onClick: () => handleDeleteSecret(row) }, { default: () => '删除' }) },
+  { title: '操作', key: 'actions', width: 140, render: (row) => h(NSpace, { size: 4 }, {
+    default: () => [
+      h(NButton, { size: 'tiny', onClick: () => handleEditSecret(row) }, { default: () => '编辑' }),
+      h(NButton, { size: 'tiny', type: 'error', onClick: () => handleDeleteSecret(row) }, { default: () => '删除' }),
+    ],
+  }) },
 ];
 
 // Schedule columns
@@ -1254,8 +1292,14 @@ const pagesDomainColumns: DataTableColumns<any> = [
 // Pages env var columns
 const pagesEnvColumns: DataTableColumns<any> = [
   { title: '名称', key: 'name' },
-  { title: '类型', key: 'type', width: 120, render: (row) => h(NTag, { size: 'small', type: row.type === 'secret_text' ? 'warning' : 'default' }, { default: () => row.type === 'secret_text' ? '加密' : '明文' }) },
+  { title: '类型', key: 'type', width: 100, render: (row) => h(NTag, { size: 'small', type: row.type === 'secret_text' ? 'warning' : 'default' }, { default: () => row.type === 'secret_text' ? '加密' : '明文' }) },
   { title: '值', key: 'value', ellipsis: true },
+  { title: '操作', key: 'actions', width: 140, render: (row) => h(NSpace, { size: 4 }, {
+    default: () => [
+      h(NButton, { size: 'tiny', onClick: () => handleEditPagesEnv(row) }, { default: () => '编辑' }),
+      h(NButton, { size: 'tiny', type: 'error', onClick: () => handleDeletePagesEnv(row) }, { default: () => '删除' }),
+    ],
+  }) },
 ];
 
 // Pages bindings columns
