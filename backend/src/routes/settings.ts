@@ -29,7 +29,7 @@ router.put('/proxy', (req, res) => {
   }
   if (proxy_url !== '') {
     try {
-      validateUrl(proxy_url, { allowedProtocols: ['http:', 'https:', 'socks4:', 'socks5:', 'socks5h:'], allowPrivateIp: false });
+      validateUrl(proxy_url, { allowedProtocols: ['http:', 'https:', 'socks4:', 'socks5:', 'socks5h:'], allowPrivateIp: true });
     } catch (e: any) {
       res.status(400).json({ error: { code: 'INVALID_PROXY_URL', message: e.message } });
       return;
