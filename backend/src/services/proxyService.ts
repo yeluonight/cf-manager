@@ -70,15 +70,22 @@ export async function testProxyConnection(proxyUrl: string): Promise<{ latency_m
     ? new SocksProxyAgent(proxyUrl)
     : new HttpsProxyAgent(proxyUrl);
 
-  const start = Date.now();
-  const resp = await nodeFetch('https://api.cloudflare.com/client/v4/ips', {
-    agent,
-    timeout: 10000,
-  });
-  const latency = Date.now() - start;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
 
-  if (!resp.ok) {
-    throw new Error(`Upstream returned HTTP ${resp.status}`);
+  const start = Date.now();
+  try {
+    const resp = await nodeFetch('https://api.cloudflare.com/client/v4/ips', {
+      agent,
+      signal: controller.signal,
+    });
+    const latency = Date.now() - start;
+
+    if (!resp.ok) {
+      throw new Error(`Upstream returned HTTP ${resp.status}`);
+    }
+    return { latency_ms: latency, status: resp.status };
+  } finally {
+    clearTimeout(timer);
   }
-  return { latency_ms: latency, status: resp.status };
 }

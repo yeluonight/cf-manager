@@ -11,7 +11,7 @@ router.get('/', (_req, res) => {
   res.json({
     encryption_key_configured: !!config.encryptionKey,
     api_secret_configured: !!config.apiSecret,
-    proxy_url_configured: !!getProxyUrl(),
+    proxy_url: getProxyUrl() || '',
   });
 });
 
@@ -50,7 +50,8 @@ router.post('/proxy/test', async (req, res) => {
   try {
     validateUrl(url, { allowedProtocols: ['http:', 'https:', 'socks4:', 'socks5:', 'socks5h:'], allowPrivateIp: true });
     const result = await testProxyConnection(url);
-    res.json({ success: true, ...result });
+    // Return flat success response — responseWrapper will wrap into { success, data }
+    res.json({ success: true, latency_ms: result.latency_ms, status: result.status });
   } catch (err: any) {
     res.status(502).json({ error: { code: 'PROXY_TEST_FAILED', message: err.message || 'Proxy test failed' } });
   }

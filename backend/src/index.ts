@@ -1,3 +1,7 @@
+// Force Cloudflare SDK to use node-fetch (which supports `agent`/proxy)
+// Must be imported before any 'cloudflare' import
+import 'cloudflare/shims/node';
+
 import express from 'express';
 import cors from 'cors';
 import { config } from './config';
