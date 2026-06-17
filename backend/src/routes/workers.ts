@@ -42,20 +42,41 @@ router.get('/', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const accounts = getActiveAccountsByFeature('workers');
     const allItems: Array<any> = [];
-    for (const account of accounts) {
-      try {
-        const workers = await listWorkers(account);
-        allItems.push(...workers.map(w => ({ ...w, type: 'worker', cfAccountId: account.id, accountName: account.name })));
-      } catch (err) {
-        appLogger.error(`[Workers] Failed to list workers for ${account.name}: ${err}`);
-      }
-      try {
-        const pages = await listPages(account);
-        allItems.push(...pages.map(p => ({ ...p, type: 'pages', cfAccountId: account.id, accountName: account.name })));
-      } catch (err) {
-        appLogger.error(`[Pages] Failed to list pages for ${account.name}: ${err}`);
+
+    const WORKER_TIMEOUT = 15000; // 15s per account
+
+    const results = await Promise.allSettled(
+      accounts.map(async (account) => {
+        const items: Array<any> = [];
+        try {
+          const workers = await listWorkers(account);
+          items.push(...workers.map(w => ({
+            ...w,
+            name: w.name || w.id,
+            status: w.status || 'active',
+            type: 'worker',
+            cfAccountId: account.id,
+            accountName: account.name,
+          })));
+        } catch (err) {
+          appLogger.error(`[Workers] Failed to list workers for ${account.name}: ${err}`);
+        }
+        try {
+          const pages = await listPages(account);
+          items.push(...pages.map(p => ({ ...p, type: 'pages', cfAccountId: account.id, accountName: account.name })));
+        } catch (err) {
+          appLogger.error(`[Pages] Failed to list pages for ${account.name}: ${err}`);
+        }
+        return items;
+      })
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        allItems.push(...result.value);
       }
     }
+
     res.json(allItems);
   } catch (err) { next(err); }
 });

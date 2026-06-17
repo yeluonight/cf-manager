@@ -8,10 +8,11 @@ import { appLogger } from './logger';
 export interface WorkerScript {
   id: string;
   name?: string;
-  created_on: string;
-  modified_on: string;
-  etag: string;
-  handlers: string[];
+  status?: string;
+  created_on?: string;
+  modified_on?: string;
+  etag?: string;
+  handlers?: string[];
 }
 
 export interface PagesProject {
