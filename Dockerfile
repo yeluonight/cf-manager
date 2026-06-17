@@ -36,14 +36,14 @@ COPY --from=backend-builder /app/node_modules /app/node_modules
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Data directory for SQLite
-RUN mkdir -p /app/data && chown -R 101:101 /app/data
+RUN mkdir -p /data && chown -R 101:101 /data
 
 # Entrypoint: start nginx (background) + node (foreground)
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 ENV PORT=3001
-ENV DB_PATH=/app/data/cf-manager.db
+ENV DB_PATH=/data/cf-manager.db
 
 EXPOSE 80
 

@@ -8,10 +8,10 @@ services:
       ENCRYPTION_KEY: changeme
       API_SECRET: changeme
       PROXY_URL: ""
-      DB_PATH: /app/data/cf-manager.db
+      DB_PATH: /data/cf-manager.db
       CORS_ORIGINS: ""
     volumes:
-      - cf-data:/app/data
+      - cf-data:/data
 
 volumes:
   cf-data:
