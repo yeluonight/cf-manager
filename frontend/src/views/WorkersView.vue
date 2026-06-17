@@ -8,6 +8,13 @@
       </n-space>
     </n-space>
 
+    <n-space align="center" style="margin-bottom: 12px">
+      <n-select v-model:value="workerAccountFilter" :options="workerAccountOptions"
+        placeholder="全部账号" style="width: 200px" size="small" clearable />
+      <n-input v-model:value="workerSearch" placeholder="搜索名称" size="small"
+        style="width: 200px" clearable />
+    </n-space>
+
     <!-- Workers Usage per Account -->
     <n-space v-if="usageData.length" style="margin-bottom: 12px" align="center">
       <n-card v-for="u in usageData" :key="u.accountId" size="small" style="min-width: 200px">
@@ -38,7 +45,7 @@
 
     <n-data-table
       :columns="columns"
-      :data="workerStore.workers"
+      :data="filteredWorkers"
       :loading="workerStore.loading"
       :bordered="false"
       :scroll-x="700"
@@ -521,6 +528,23 @@ import { workersApi } from '../api/workers';
 const workerStore = useWorkerStore();
 const accountStore = useAccountStore();
 const message = useMessage();
+
+// ============ Filter & Search ============
+const workerAccountFilter = ref<number | null>(null);
+const workerSearch = ref('');
+
+const workerAccountOptions = computed(() =>
+  accountStore.accounts
+    .filter((a: any) => a.is_active && (a.enabled_features || '').includes('workers'))
+    .map((a: any) => ({ label: a.name, value: a.id }))
+);
+
+const filteredWorkers = computed(() => {
+  let list = workerStore.workers;
+  if (workerAccountFilter.value) list = list.filter((w: any) => w.cfAccountId === workerAccountFilter.value);
+  if (workerSearch.value) list = list.filter((w: any) => (w.name || '').toLowerCase().includes(workerSearch.value.toLowerCase()));
+  return list;
+});
 
 function drawerWidth(desktopWidth: number): number {
   return window.innerWidth <= 768 ? Math.min(window.innerWidth, desktopWidth) : desktopWidth;

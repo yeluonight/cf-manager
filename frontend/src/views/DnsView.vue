@@ -1,13 +1,19 @@
 <template>
   <div>
     <n-h2>DNS 管理</n-h2>
+    <n-space align="center" style="margin-bottom: 12px">
+      <n-select v-model:value="dnsAccountFilter" :options="dnsAccountOptions"
+        placeholder="全部账号" style="width: 200px" size="small" clearable />
+      <n-input v-model:value="dnsSearch" placeholder="搜索域名" size="small"
+        style="width: 200px" clearable />
+    </n-space>
     <n-grid :cols="24" :x-gap="12" :y-gap="12" responsive="screen" item-responsive>
       <!-- 左侧域名列表 -->
       <n-gi span="24 m:6">
         <n-card title="域名列表" size="small">
           <n-list hoverable clickable>
             <n-list-item
-              v-for="d in dnsStore.domains"
+              v-for="d in filteredDomains"
               :key="d.name || d"
               @click="selectDomain(typeof d === 'string' ? d : d.name)"
               :style="{ background: dnsStore.currentDomain === (typeof d === 'string' ? d : d.name) ? 'rgba(24,160,88,0.1)' : '' }"
@@ -16,7 +22,7 @@
               <n-text v-if="d.accountName" depth="3" style="font-size: 11px">{{ d.accountName }}</n-text>
             </n-list-item>
           </n-list>
-          <n-empty v-if="!dnsStore.domains.length" description="暂无域名" style="margin-top: 16px" />
+          <n-empty v-if="!filteredDomains.length" description="暂无域名" style="margin-top: 16px" />
         </n-card>
       </n-gi>
 
@@ -66,14 +72,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, h, onMounted } from 'vue';
+import { ref, computed, h, onMounted } from 'vue';
 import { NButton, NSwitch, NTag, NText, useMessage } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { useDnsStore } from '../stores/dnsStore';
+import { useAccountStore } from '../stores/accountStore';
 import { dnsApi } from '../api/dns';
 
 const dnsStore = useDnsStore();
+const accountStore = useAccountStore();
 const message = useMessage();
+
+const dnsAccountFilter = ref<number | null>(null);
+const dnsSearch = ref('');
+
+const dnsAccountOptions = computed(() =>
+  accountStore.accounts
+    .filter((a: any) => a.is_active && (a.enabled_features || '').includes('dns'))
+    .map((a: any) => ({ label: a.name, value: a.id }))
+);
+
+const filteredDomains = computed(() => {
+  let list = dnsStore.domains;
+  if (dnsAccountFilter.value) list = list.filter((d: any) => d.cfAccountId === dnsAccountFilter.value);
+  if (dnsSearch.value) list = list.filter((d: any) => (d.name || '').toLowerCase().includes(dnsSearch.value.toLowerCase()));
+  return list;
+});
 
 const showAddModal = ref(false);
 const adding = ref(false);
@@ -131,5 +155,6 @@ const recordColumns: DataTableColumns<any> = [
 
 onMounted(() => {
   dnsStore.fetchDomains();
+  accountStore.fetchAccounts();
 });
 </script>

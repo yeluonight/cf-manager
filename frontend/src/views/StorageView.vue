@@ -841,15 +841,15 @@ function isImageType(contentType: string): boolean {
 
 async function handlePreviewR2(row: any) {
   if (!selectedAccount.value || !selectedR2Bucket.value) return;
-  r2PreviewName.value = row.name;
+  // Use key's filename portion for display name (preserves extension)
+  r2PreviewName.value = row.key?.split('/').pop() || row.name;
   r2PreviewKey.value = row.key;
   r2PreviewUrl.value = '';
   r2PreviewLoading.value = true;
   showR2Preview.value = true;
   try {
     const resp = await storageApi.downloadR2Object(selectedAccount.value, selectedR2Bucket.value.name, row.key);
-    const blob = new Blob([resp.data], { type: row.contentType || 'image/png' });
-    r2PreviewUrl.value = URL.createObjectURL(blob);
+    r2PreviewUrl.value = URL.createObjectURL(resp.data);
   } catch {
     message.error('加载图片失败');
   } finally {
@@ -861,11 +861,13 @@ async function handleDownloadR2(row: any) {
   if (!selectedAccount.value || !selectedR2Bucket.value) return;
   try {
     const resp = await storageApi.downloadR2Object(selectedAccount.value, selectedR2Bucket.value.name, row.key);
-    const blob = new Blob([resp.data]);
+    const blob = resp.data;
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = row.name;
+    // Use key's filename portion to preserve extension
+    const filename = row.key?.split('/').pop() || row.name || 'download';
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   } catch {}
