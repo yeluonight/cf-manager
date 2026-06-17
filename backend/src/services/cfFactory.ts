@@ -29,7 +29,7 @@ function makeProxiedFetch(agent: any): any {
 
 export function getCfClient(account: Account): Cloudflare {
   const httpAgent = getHttpAgent();
-  const opts: Record<string, any> = {};
+  const opts: Record<string, any> = { timeout: 30000 }; // 30s default (SDK default is 60s)
 
   if (httpAgent) {
     opts.fetch = makeProxiedFetch(httpAgent);

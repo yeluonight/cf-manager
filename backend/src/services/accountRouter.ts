@@ -26,18 +26,32 @@ export async function getAllZones(): Promise<Array<Zone & { cfAccountId: number;
   const accounts = getActiveAccountsByFeature('dns');
   const allZones: Array<Zone & { cfAccountId: number; accountName: string }> = [];
 
-  for (const account of accounts) {
-    try {
+  const ZONE_TIMEOUT = 15000; // 15s per account
+
+  // Fetch zones from all accounts in parallel, with per-account timeout
+  const results = await Promise.allSettled(
+    accounts.map(async (account) => {
+      const zones: Array<Zone & { cfAccountId: number; accountName: string }> = [];
       const cf = getCfClient(account);
-      const zones: Zone[] = [];
-      for await (const zone of cf.zones.list({ per_page: 100 })) {
-        zones.push(zone as any);
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), ZONE_TIMEOUT);
+      try {
+        for await (const zone of cf.zones.list({ per_page: 100 }, { signal: ac.signal })) {
+          zones.push({ ...(zone as any), cfAccountId: account.id, accountName: account.name });
+        }
+      } finally {
+        clearTimeout(timer);
       }
-      for (const zone of zones) {
-        allZones.push({ ...zone, cfAccountId: account.id, accountName: account.name });
-      }
-    } catch (err) {
-      appLogger.error(`Failed to fetch zones for account ${account.name}: ${err}`);
+      return zones;
+    })
+  );
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      allZones.push(...result.value);
+    } else {
+      const reason = result.reason;
+      if (reason) appLogger.error(`Zone fetch failed: ${reason}`);
     }
   }
 
