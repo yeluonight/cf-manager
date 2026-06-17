@@ -3,7 +3,7 @@ services:
     image: ghcr.io/yeluonight/cf-manager:latest
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${APP_PORT:-3000}:80"
+      - "${APP_PORT:-3000}:80"
     environment:
       - PORT=3001
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
