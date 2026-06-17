@@ -5,10 +5,6 @@ export function v1RequestLogger(req: Request, res: Response, next: NextFunction)
   const start = Date.now();
   const { method, originalUrl } = req;
 
-  const bodySnippet = req.body
-    ? JSON.stringify(req.body).slice(0, 200)
-    : '';
-
   let logged = false;
 
   function log(suffix?: string) {
@@ -16,10 +12,7 @@ export function v1RequestLogger(req: Request, res: Response, next: NextFunction)
     logged = true;
     const duration = Date.now() - start;
     const tag = suffix ? ` [${suffix}]` : '';
-    logger.info(
-      `${method} ${originalUrl} ${res.statusCode} ${duration}ms${tag}` +
-      (bodySnippet ? ` body=${bodySnippet}` : ''),
-    );
+    logger.info(`${method} ${originalUrl} ${res.statusCode} ${duration}ms${tag}`);
   }
 
   res.on('finish', () => log());

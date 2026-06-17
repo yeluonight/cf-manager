@@ -23,7 +23,7 @@ export function getCfClient(account: Account): Cloudflare {
     try {
       return new Cloudflare({ apiToken: decrypt(account.api_token), ...opts });
     } catch (err) {
-      throw new Error(`Failed to decrypt credentials for account ${account.id}: ${err}`);
+      throw new Error(`Invalid encrypted credentials for account ${account.id}`);
     }
   }
   if (!account.api_key) throw new Error(`Account ${account.id} is missing api_key`);
@@ -31,7 +31,7 @@ export function getCfClient(account: Account): Cloudflare {
   try {
     return new Cloudflare({ apiKey: decrypt(account.api_key), apiEmail: account.email, ...opts });
   } catch (err) {
-    throw new Error(`Failed to decrypt credentials for account ${account.id}: ${err}`);
+    throw new Error(`Invalid encrypted credentials for account ${account.id}`);
   }
 }
 

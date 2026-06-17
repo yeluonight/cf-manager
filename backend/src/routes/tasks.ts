@@ -20,6 +20,11 @@ router.post('/', (req: Request, res: Response, next: NextFunction) => {
       res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'name, type, and cron are required' } });
       return;
     }
+    const VALID_TYPES = ['dns_sync', 'worker_deploy', 'env_sync', 'cache_purge'];
+    if (!VALID_TYPES.includes(type)) {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: `type must be one of: ${VALID_TYPES.join(', ')}` } });
+      return;
+    }
     const id = createTask(name, type, cron, config);
     createAuditLog(null, 'task_create', name, `type=${type} cron=${cron}`, 'success');
     res.status(201).json({ id });
@@ -29,7 +34,10 @@ router.post('/', (req: Request, res: Response, next: NextFunction) => {
 router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    updateTask(id, req.body);
+    if (isNaN(id)) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'id must be a number' } }); return; }
+    // Only allow whitelisted fields to be updated
+    const { name, cron, config, enabled } = req.body;
+    updateTask(id, { name, cron, config, enabled });
     res.json({ success: true });
   } catch (err) { next(err); }
 });
@@ -37,6 +45,7 @@ router.put('/:id', (req: Request, res: Response, next: NextFunction) => {
 router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'id must be a number' } }); return; }
     const task = getTaskById(id);
     deleteTask(id);
     createAuditLog(null, 'task_delete', task?.name || String(id), null, 'success');
@@ -47,6 +56,7 @@ router.delete('/:id', (req: Request, res: Response, next: NextFunction) => {
 router.post('/:id/run', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id as string, 10);
+    if (isNaN(id)) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'id must be a number' } }); return; }
     const result = await runTaskNow(id);
     const task = getTaskById(id);
     createAuditLog(null, 'task_run', task?.name || String(id), result.status, 'success');
@@ -57,7 +67,8 @@ router.post('/:id/run', async (req: Request, res: Response, next: NextFunction) 
 router.get('/:id/history', (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id as string, 10);
-    const limit = req.query.limit ? Number(req.query.limit) : 20;
+    if (isNaN(id)) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'id must be a number' } }); return; }
+    const limit = req.query.limit ? Math.min(Math.max(Number(req.query.limit) || 0, 1), 100) : 20;
     res.json(getTaskHistory(id, limit));
   } catch (err) { next(err); }
 });

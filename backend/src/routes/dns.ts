@@ -25,8 +25,10 @@ router.post('/domains/:domain/records', async (req: Request, res: Response, next
   try {
     const domain = req.params.domain as string;
     const { account, zoneId } = await findAccountByDomain(domain);
-    const record = await createDnsRecord(account, zoneId, req.body);
-    createAuditLog(account.id, 'create_dns', domain, `${req.body.type} ${req.body.name} → ${req.body.content}`, 'success');
+    // Only allow known DNS record fields
+    const { type, name, content, ttl, proxied, priority } = req.body;
+    const record = await createDnsRecord(account, zoneId, { type, name, content, ttl, proxied, priority });
+    createAuditLog(account.id, 'create_dns', domain, `${type} ${name} → ${content}`, 'success');
     res.status(201).json(record);
   } catch (err) { next(err); }
 });
@@ -35,8 +37,9 @@ router.put('/domains/:domain/records/:id', async (req: Request, res: Response, n
   try {
     const domain = req.params.domain as string;
     const { account, zoneId } = await findAccountByDomain(domain);
-    const record = await updateDnsRecord(account, zoneId, req.params.id as string, req.body);
-    createAuditLog(account.id, 'update_dns', domain, `${req.body.type || ''} ${req.body.name || ''} → ${req.body.content || ''}`, 'success');
+    const { type, name, content, ttl, proxied, priority } = req.body;
+    const record = await updateDnsRecord(account, zoneId, req.params.id as string, { type, name, content, ttl, proxied, priority });
+    createAuditLog(account.id, 'update_dns', domain, `${type || ''} ${name || ''} → ${content || ''}`, 'success');
     res.json(record);
   } catch (err) { next(err); }
 });

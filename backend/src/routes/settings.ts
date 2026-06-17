@@ -3,6 +3,7 @@ import { config } from '../config';
 import { clearCache } from '../services/accountRouter';
 import { clearClientCache } from '../services/cfFactory';
 import { getProxyUrl, setProxyUrl, testProxyConnection } from '../services/proxyService';
+import { validateUrl } from '../utils/urlValidator';
 
 const router = Router();
 
@@ -10,8 +11,7 @@ router.get('/', (_req, res) => {
   res.json({
     encryption_key_configured: !!config.encryptionKey,
     api_secret_configured: !!config.apiSecret,
-    db_path: config.dbPath,
-    proxy_url: getProxyUrl(),
+    proxy_url_configured: !!getProxyUrl(),
   });
 });
 
@@ -27,6 +27,14 @@ router.put('/proxy', (req, res) => {
     res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'proxy_url must be a string' } });
     return;
   }
+  if (proxy_url !== '') {
+    try {
+      validateUrl(proxy_url, { allowedProtocols: ['http:', 'https:', 'socks4:', 'socks5:', 'socks5h:'], allowPrivateIp: false });
+    } catch (e: any) {
+      res.status(400).json({ error: { code: 'INVALID_PROXY_URL', message: e.message } });
+      return;
+    }
+  }
   setProxyUrl(proxy_url);
   clearClientCache();
   res.json({ success: true, proxy_url: getProxyUrl() });
@@ -40,6 +48,7 @@ router.post('/proxy/test', async (req, res) => {
     return;
   }
   try {
+    validateUrl(url, { allowedProtocols: ['http:', 'https:', 'socks4:', 'socks5:', 'socks5h:'], allowPrivateIp: true });
     const result = await testProxyConnection(url);
     res.json({ success: true, ...result });
   } catch (err: any) {

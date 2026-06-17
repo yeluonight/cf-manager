@@ -28,6 +28,18 @@ if [ -z "${ENCRYPTION_KEY:-}" ] || [ "$ENCRYPTION_KEY" = "your-random-encryption
   exit 1
 fi
 
+if [ -z "${API_SECRET:-}" ]; then
+  err "API_SECRET is not set. Running without authentication is no longer allowed."
+  err "Generate one with: openssl rand -hex 32"
+  exit 1
+fi
+
+# Check .env file permissions — warn if too permissive
+ENV_PERMS=$(stat -c '%a' .env 2>/dev/null || stat -f '%Lp' .env 2>/dev/null || echo 'unknown')
+if [ "$ENV_PERMS" != "unknown" ] && [ "$ENV_PERMS" -gt 600 ]; then
+  warn ".env file permissions are $ENV_PERMS — recommend chmod 600 for security"
+fi
+
 # ---- Deploy ----
 log "Building new images (old containers keep running) ..."
 DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build --parallel

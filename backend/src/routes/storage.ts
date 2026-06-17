@@ -54,10 +54,11 @@ router.get('/:accountId/kv/:nsId/keys', async (req: Request, res: Response, next
     const account = getAccountOr404(req, res);
     if (!account) return;
     const { prefix, cursor, limit } = req.query;
+    const parsedLimit = limit ? Math.min(Math.max(Number(limit) || 0, 1), 1000) : undefined;
     const result = await listKvKeys(account, p(req, 'nsId'), {
       prefix: prefix as string,
       cursor: cursor as string,
-      limit: limit ? Number(limit) : undefined,
+      limit: parsedLimit,
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -99,6 +100,7 @@ router.post('/:accountId/kv/:nsId/bulk-delete', async (req: Request, res: Respon
     if (!account) return;
     const { keys } = req.body;
     if (!Array.isArray(keys)) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'keys must be an array' } }); return; }
+    if (keys.length > 1000) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'keys array cannot exceed 1000 items' } }); return; }
     await bulkDeleteKvKeys(account, p(req, 'nsId'), keys);
     createAuditLog(account.id, 'kv_bulk_delete', p(req, 'nsId'), `${keys.length} keys`, 'success');
     res.json({ success: true });
@@ -162,7 +164,7 @@ router.post('/:accountId/d1/:dbId/query', async (req: Request, res: Response, ne
     if (!account) return;
     const { sql, allowWrite } = req.body;
     if (!sql) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'sql is required' } }); return; }
-    const isWrite = /^\s*(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE)\b/i.test(sql);
+    const isWrite = /^\s*(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|DETACH|REINDEX|REPLACE|TRUNCATE)\b/i.test(sql);
     if (isWrite && !allowWrite) {
       res.status(400).json({ error: { code: 'WRITE_NOT_ALLOWED', message: 'Write query requires allowWrite: true' } });
       return;
@@ -220,11 +222,12 @@ router.get('/:accountId/r2/:bucket/objects', async (req: Request, res: Response,
     const account = getAccountOr404(req, res);
     if (!account) return;
     const { prefix, delimiter, cursor, limit } = req.query;
+    const parsedLimit = limit ? Math.min(Math.max(Number(limit) || 0, 1), 1000) : undefined;
     const result = await listR2Objects(account, p(req, 'bucket'), {
       prefix: prefix as string,
       delimiter: (delimiter as string) || '/',
       cursor: cursor as string,
-      limit: limit ? Number(limit) : undefined,
+      limit: parsedLimit,
     });
     res.json(result);
   } catch (err) { next(err); }
@@ -242,7 +245,9 @@ router.get('/:accountId/r2/:bucket/download', async (req: Request, res: Response
     const cl = objResp.headers.get('content-length');
     if (cl) res.setHeader('Content-Length', cl);
     const inline = req.query.inline === '1' || req.query.inline === 'true';
-    res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${key.split('/').pop()}"`);
+    // Sanitize filename to prevent header injection
+    const safeName = (key.split('/').pop() || 'download').replace(/[^a-zA-Z0-9._-]/g, '_');
+    res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(safeName)}`);
     const body = objResp.body as any;
     if (body) {
       if (typeof body.getReader === 'function') {
@@ -295,6 +300,7 @@ router.post('/:accountId/r2/:bucket/bulk-delete', async (req: Request, res: Resp
     if (!account) return;
     const { keys } = req.body;
     if (!Array.isArray(keys)) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'keys must be an array' } }); return; }
+    if (keys.length > 1000) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'keys array cannot exceed 1000 items' } }); return; }
     await bulkDeleteR2Objects(account, p(req, 'bucket'), keys);
     createAuditLog(account.id, 'r2_bulk_delete', p(req, 'bucket'), `${keys.length} objects`, 'success');
     res.json({ success: true });

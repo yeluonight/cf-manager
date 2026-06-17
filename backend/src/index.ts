@@ -24,8 +24,13 @@ import { appLogger } from './services/logger';
 
 const app = express();
 
-app.use(cors());
-app.use(express.json({ limit: '100mb' }));
+const allowedOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+
+app.use(cors({
+  origin: allowedOrigins.length > 0 ? allowedOrigins : false,
+  credentials: true,
+}));
+app.use(express.json({ limit: '10mb' }));
 
 // Health check — before auth so Docker healthcheck works without API_SECRET
 app.get('/api/health', (_req, res) => {
@@ -76,9 +81,11 @@ async function start() {
 
 process.on('uncaughtException', (err) => {
   appLogger.error(`[UNCAUGHT] ${err}`);
+  process.exit(1);
 });
 process.on('unhandledRejection', (err) => {
   appLogger.error(`[UNHANDLED_REJECTION] ${err}`);
+  process.exit(1);
 });
 
 start().catch((err) => appLogger.error(`[STARTUP] ${err}`));

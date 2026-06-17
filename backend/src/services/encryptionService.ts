@@ -2,21 +2,18 @@ import crypto from 'crypto';
 import { config } from '../config';
 
 const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH = 16;
+const IV_LENGTH = 12; // NIST SP 800-38D recommended: 96 bits
 
 function getKey(): Buffer {
-  if (!config.encryptionKey) {
+  if (!config.encryptionKey || config.encryptionKey.length === 0) {
     throw new Error('ENCRYPTION_KEY environment variable is required');
   }
-  // 支持两种格式：
-  // 1. 64位 hex 字符串（如 openssl rand -hex 32 生成）
-  // 2. 任意长度字符串（自动 SHA-256 哈希为 32 字节）
+  // Only accept 64-char hex strings (32 bytes of randomness, e.g. openssl rand -hex 32)
   const key = config.encryptionKey;
   if (/^[0-9a-fA-F]{64}$/.test(key)) {
     return Buffer.from(key, 'hex');
   }
-  // 对非 hex 格式的密钥，使用 SHA-256 哈希
-  return crypto.createHash('sha256').update(key).digest();
+  throw new Error('ENCRYPTION_KEY must be a 64-character hex string (use: openssl rand -hex 32)');
 }
 
 export function encrypt(text: string): string {
@@ -32,6 +29,9 @@ export function encrypt(text: string): string {
 export function decrypt(encryptedText: string): string {
   const key = getKey();
   const parts = encryptedText.split(':');
+  if (parts.length !== 3) {
+    throw new Error('Invalid encrypted text format');
+  }
   const iv = Buffer.from(parts[0], 'hex');
   const tag = Buffer.from(parts[1], 'hex');
   const encrypted = parts[2];

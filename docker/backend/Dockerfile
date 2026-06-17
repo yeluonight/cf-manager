@@ -19,7 +19,10 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chown -R node:node /app/data
+
+# Run as non-root user
+USER node
 
 ENV PORT=3001
 ENV DB_PATH=/app/data/cf-manager.db

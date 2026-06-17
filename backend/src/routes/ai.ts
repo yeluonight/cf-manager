@@ -25,6 +25,14 @@ router.post('/inference', async (req, res, next) => {
   try {
     const { model, prompt, messages: historyMessages, accountId } = req.body;
 
+    if (!model || typeof model !== 'string') {
+      throw Object.assign(new Error('model is required'), { statusCode: 400 });
+    }
+    // Validate model name: only allow Cloudflare AI model identifiers
+    if (!/^[a-zA-Z0-9_@./-]+$/.test(model)) {
+      throw Object.assign(new Error('Invalid model identifier'), { statusCode: 400 });
+    }
+
     if (accountId) {
       const account = getAccountById(accountId);
       if (!account) {
@@ -49,7 +57,7 @@ router.post('/inference', async (req, res, next) => {
         (chunk) => { res.write(`data: ${JSON.stringify({ type: 'content', chunk })}\n\n`); },
         (chunk) => { res.write(`data: ${JSON.stringify({ type: 'reasoning', chunk })}\n\n`); },
         () => { res.write('data: [DONE]\n\n'); res.end(); },
-        (err) => { res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`); res.end(); }
+        (err) => { res.write(`data: ${JSON.stringify({ error: err.message?.includes('4006') ? 'Account quota exhausted' : 'Inference failed' })}\n\n`); res.end(); }
       );
     }
 

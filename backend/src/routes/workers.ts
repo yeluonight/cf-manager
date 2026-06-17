@@ -5,6 +5,7 @@ import { getActiveAccountsByFeature, getAccountById } from '../models/account';
 import { createAuditLog } from '../models/auditLog';
 import { appLogger } from '../services/logger';
 import { getAccountOr404 } from './routeUtils';
+import { validateUrl } from '../utils/urlValidator';
 import {
   listWorkers, listPages, deployWorker, deployWorkerFromUrl, deleteWorker, deletePagesProject, getWorkerLogs, deployPages,
   // Secrets
@@ -68,6 +69,7 @@ router.post('/:accountId/workers', upload.single('script'), async (req: Request,
     if (!name) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Worker name is required' } }); return; }
     // Support both file upload and URL
     if (req.body.url) {
+      validateUrl(req.body.url); // SSRF protection
       const result = await deployWorkerFromUrl(account, name, req.body.url);
       createAuditLog(account.id, 'deploy_worker', name, `from_url=${req.body.url}`, 'success');
       res.status(201).json(result);
@@ -493,8 +495,14 @@ router.post('/batch-deploy', upload.single('script'), async (req: Request, res: 
     if (!Array.isArray(parsedTargets) || parsedTargets.length === 0) {
       res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'targets must be a non-empty array' } }); return;
     }
+    if (parsedTargets.length > 50) {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'targets array cannot exceed 50 items' } }); return;
+    }
     if (!req.file && !scriptUrl) {
       res.status(400).json({ error: { code: 'NO_FILE', message: 'Script file or URL is required' } }); return;
+    }
+    if (scriptUrl) {
+      try { validateUrl(scriptUrl); } catch (e: any) { res.status(400).json({ error: { code: 'INVALID_URL', message: e.message } }); return; }
     }
     const scriptContent = req.file ? req.file.buffer.toString('utf-8') : null;
     const results: Array<{ accountId: number; workerName: string; success: boolean; error?: string }> = [];
@@ -525,13 +533,17 @@ router.post('/batch-deploy-pages', upload.single('zipFile'), async (req: Request
     if (!Array.isArray(parsedTargets) || parsedTargets.length === 0) {
       res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'targets must be a non-empty array' } }); return;
     }
+    if (parsedTargets.length > 50) {
+      res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'targets array cannot exceed 50 items' } }); return;
+    }
     if (!req.file) {
       res.status(400).json({ error: { code: 'NO_FILE', message: 'Zip file is required' } }); return;
     }
     const zip = new AdmZip(req.file.buffer);
     const entries = zip.getEntries();
+    // Prevent path traversal in zip entries
     const files = entries
-      .filter(e => !e.isDirectory)
+      .filter(e => !e.isDirectory && !e.entryName.includes('..'))
       .map(e => ({ path: e.entryName, buffer: e.getData() }));
 
     if (files.length === 0) {

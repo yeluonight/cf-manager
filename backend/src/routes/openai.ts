@@ -37,6 +37,10 @@ router.post('/chat/completions', async (req: Request, res: Response, next: NextF
       return;
     }
 
+    // Only forward whitelisted fields to Cloudflare API
+    const { model, messages, stream, temperature, max_tokens, top_p, frequency_penalty, presence_penalty } = req.body;
+    const forwardedBody = { model, messages, stream, temperature, max_tokens, top_p, frequency_penalty, presence_penalty };
+
     const isStream = req.body.stream === true;
     let lastError = '';
 
@@ -49,7 +53,7 @@ router.post('/chat/completions', async (req: Request, res: Response, next: NextF
       const cfResp = await proxyFetch(cfUrl, {
         method: 'POST',
         headers,
-        body: JSON.stringify(req.body),
+        body: JSON.stringify(forwardedBody),
       });
 
       if (!cfResp.ok) {
@@ -59,15 +63,15 @@ router.post('/chat/completions', async (req: Request, res: Response, next: NextF
           appLogger.warn(`[AI] Account ${account.name} neuron limit hit (4006)`);
           setQuota(account.id, 'ai_neurons', 10000);
           clearCache();
-          createAuditLog(account.id, 'ai_inference', req.body.model, '4006 neuron limit, switching', 'error');
+          createAuditLog(account.id, 'ai_inference', model || 'unknown', '4006 neuron limit, switching', 'error');
           if (accounts.indexOf(account) < accounts.length - 1) {
             lastError = errorText;
             continue;
           }
         }
 
-        res.status(cfResp.status).json({
-          error: { message: errorText, type: 'upstream_error', code: cfResp.status },
+        res.status(cfResp.status >= 500 ? 502 : cfResp.status).json({
+          error: { message: cfResp.status >= 500 ? 'Upstream service error' : errorText, type: 'upstream_error', code: cfResp.status },
         });
         return;
       }
@@ -98,11 +102,11 @@ router.post('/chat/completions', async (req: Request, res: Response, next: NextF
           } catch { /* client disconnected */ }
         }
         res.end();
-        createAuditLog(account.id, 'ai_inference', req.body.model, 'stream via /v1', 'success');
+        createAuditLog(account.id, 'ai_inference', model || 'unknown', 'stream via /v1', 'success');
       } else {
         const data = await cfResp.json() as any;
         res.json(data);
-        createAuditLog(account.id, 'ai_inference', req.body.model,
+        createAuditLog(account.id, 'ai_inference', model || 'unknown',
           `tokens: ${data?.usage?.total_tokens || '?'}`, 'success');
       }
       return;
