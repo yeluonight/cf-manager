@@ -13,7 +13,7 @@ if [ ! -f .env ]; then
   if [ -f .env.example ]; then
     cp .env.example .env
     warn ".env not found, copied from .env.example"
-    warn "Please edit .env (set ENCRYPTION_KEY at minimum), then re-run."
+    warn "Please edit .env (set ENCRYPTION_KEY and API_SECRET), then re-run."
     exit 1
   else
     err ".env missing. Create one from .env.example first."
@@ -23,7 +23,7 @@ fi
 
 source .env
 
-if [ -z "${ENCRYPTION_KEY:-}" ] || [ "$ENCRYPTION_KEY" = "your-random-encryption-key-here" ]; then
+if [ -z "${ENCRYPTION_KEY:-}" ]; then
   err "ENCRYPTION_KEY is not set. Edit .env first."
   exit 1
 fi
@@ -41,8 +41,8 @@ if [ "$ENV_PERMS" != "unknown" ] && [ "$ENV_PERMS" -gt 600 ]; then
 fi
 
 # ---- Deploy ----
-log "Building new images (old containers keep running) ..."
-DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build --parallel
+log "Building new image (old container keeps running) ..."
+DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker compose build
 
 log "Rolling update ..."
 docker compose up -d --remove-orphans
@@ -50,7 +50,7 @@ docker compose up -d --remove-orphans
 log "Cleaning up old images ..."
 docker image prune -f 2>/dev/null || true
 
-log "Waiting for services to become healthy ..."
+log "Waiting for service to become healthy ..."
 for i in $(seq 1 15); do
   STATUS=$(docker compose ps --format json 2>/dev/null || true)
   if echo "$STATUS" | grep -qE '"unhealthy"|"starting"'; then

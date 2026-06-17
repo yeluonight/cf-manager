@@ -9,7 +9,8 @@ node_modules
 data/
 backend/dist
 frontend/dist
-docker/backend/Dockerfile
 *.log
 .cursor
 .vscode
+docker/frontend
+docker/backend
