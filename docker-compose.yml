@@ -5,10 +5,11 @@ services:
     ports:
       - "${APP_PORT:-3000}:80"
     environment:
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - API_SECRET=${API_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:?请设置ENCRYPTION_KEY}
+      - API_SECRET=${API_SECRET:?请设置API_SECRET}
       - PROXY_URL=${PROXY_URL:-}
       - DB_PATH=/app/data/cf-manager.db
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
     volumes:
       - cf-data:/app/data
 
