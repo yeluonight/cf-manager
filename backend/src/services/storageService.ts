@@ -156,3 +156,15 @@ export async function bulkDeleteR2Objects(account: Account, bucketName: string, 
     await Promise.all(batch.map(key => deleteR2Object(account, bucketName, key)));
   }
 }
+
+// ============ R2 Domains ============
+
+export async function listR2CustomDomains(account: Account, bucketName: string): Promise<any> {
+  const cf = getCfClient(account);
+  return cf.r2.buckets.domains.custom.list(bucketName, { account_id: acctId(account) });
+}
+
+export async function listR2ManagedDomain(account: Account, bucketName: string): Promise<any> {
+  const cf = getCfClient(account);
+  return cf.r2.buckets.domains.managed.list(bucketName, { account_id: acctId(account) });
+}

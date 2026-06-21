@@ -6,6 +6,7 @@ import {
   createKvNamespace, deleteKvNamespace, listKvKeys, getKvValue, putKvValue, deleteKvKey, bulkDeleteKvKeys,
   createD1Database, deleteD1Database, listD1Tables, getD1TableSchema, executeD1Query,
   createR2Bucket, deleteR2Bucket, listR2Objects, getR2Object, putR2Object, deleteR2Object, bulkDeleteR2Objects,
+  listR2CustomDomains, listR2ManagedDomain,
 } from '../services/storageService';
 import { listKvNamespaces, listD1Databases, listR2Buckets } from '../services/workerService';
 
@@ -304,6 +305,40 @@ router.post('/:accountId/r2/:bucket/bulk-delete', async (req: Request, res: Resp
     await bulkDeleteR2Objects(account, p(req, 'bucket'), keys);
     createAuditLog(account.id, 'r2_bulk_delete', p(req, 'bucket'), `${keys.length} objects`, 'success');
     res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// R2 Bucket Domains (custom + managed + S3 public URL)
+router.get('/:accountId/r2/:bucket/domains', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const account = getAccountOr404(req, res);
+    if (!account) return;
+    const bucketName = p(req, 'bucket');
+
+    const [customResult, managedResult] = await Promise.allSettled([
+      listR2CustomDomains(account, bucketName),
+      listR2ManagedDomain(account, bucketName),
+    ]);
+
+    const customDomains = customResult.status === 'fulfilled'
+      ? (customResult.value?.domains || []).filter((d: any) => d.enabled && d.status?.ownership === 'active')
+      : [];
+    const managedDomain = managedResult.status === 'fulfilled' && managedResult.value?.enabled
+      ? managedResult.value.domain
+      : null;
+
+    // S3 public access URL (always constructable)
+    const s3Url = `https://${bucketName}.${account.account_id}.r2.cloudflarestorage.com`;
+
+    res.json({
+      s3_public_url: s3Url,
+      managed_domain: managedDomain,
+      custom_domains: customDomains.map((d: any) => ({
+        domain: d.domain,
+        enabled: d.enabled,
+        status: d.status,
+      })),
+    });
   } catch (err) { next(err); }
 });
 

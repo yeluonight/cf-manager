@@ -45,6 +45,8 @@ export const storageApi = {
     apiClient.delete(`/storage/${accountId}/r2/${bucket}/objects`, { params: { key } }),
   bulkDeleteR2Objects: (accountId: number, bucket: string, keys: string[]) =>
     apiClient.post(`/storage/${accountId}/r2/${bucket}/bulk-delete`, { keys }),
+  getR2BucketDomains: (accountId: number, bucket: string) =>
+    apiClient.get(`/storage/${accountId}/r2/${bucket}/domains`),
 };
 
 export const tasksApi = {

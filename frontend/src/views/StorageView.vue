@@ -266,6 +266,29 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- R2 Direct Link Modal -->
+    <n-modal v-model:show="showR2LinkModal" preset="card" title="复制文件直链" style="width: 600px; max-width: 95vw">
+      <n-spin :show="r2LinkLoading">
+        <div v-if="r2LinkKey" style="margin-bottom: 12px">
+          <n-text depth="3" style="font-size: 12px">文件：{{ r2LinkKey }}</n-text>
+        </div>
+        <n-empty v-if="!r2LinkLoading && !r2LinkUrls.length" description="无可用的公开访问域名（需开启桶的公开访问或配置自定义域名）" />
+        <div v-for="item in r2LinkUrls" :key="item.url" style="margin-bottom: 10px">
+          <n-text style="font-size: 12px; display: block; margin-bottom: 2px">{{ item.label }}</n-text>
+          <n-input :value="item.url" size="small" readonly>
+            <template #suffix>
+              <n-button size="tiny" type="primary" quaternary @click="copyToClipboard(item.url)">复制</n-button>
+            </template>
+          </n-input>
+        </div>
+      </n-spin>
+      <template #footer>
+        <n-space justify="end">
+          <n-button size="small" @click="showR2LinkModal = false">关闭</n-button>
+        </n-space>
+      </template>
+    </n-modal>
   </div>
 </template>
 
@@ -873,6 +896,51 @@ async function handleDownloadR2(row: any) {
   } catch {}
 }
 
+// R2 Direct Link
+const showR2LinkModal = ref(false);
+const r2LinkLoading = ref(false);
+const r2LinkKey = ref('');
+const r2LinkUrls = ref<{ label: string; url: string }[]>([]);
+
+async function handleCopyR2Link(row: any) {
+  if (!selectedAccount.value || !selectedR2Bucket.value) return;
+  r2LinkKey.value = row.key;
+  r2LinkLoading.value = true;
+  showR2LinkModal.value = true;
+  r2LinkUrls.value = [];
+  try {
+    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, selectedR2Bucket.value.name);
+    const urls: { label: string; url: string }[] = [];
+    // S3 public URL
+    if (data.s3_public_url) {
+      urls.push({ label: 'S3 公开访问', url: `${data.s3_public_url}/${row.key}` });
+    }
+    // R2.dev managed domain
+    if (data.managed_domain) {
+      urls.push({ label: 'R2.dev 域名', url: `https://${data.managed_domain}/${row.key}` });
+    }
+    // Custom domains
+    if (data.custom_domains?.length) {
+      for (const d of data.custom_domains) {
+        urls.push({ label: `自定义域名 (${d.domain})`, url: `https://${d.domain}/${row.key}` });
+      }
+    }
+    r2LinkUrls.value = urls;
+  } catch {
+    message.error('获取域名信息失败');
+  } finally {
+    r2LinkLoading.value = false;
+  }
+}
+
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text).then(() => {
+    message.success('已复制到剪贴板');
+  }).catch(() => {
+    message.error('复制失败');
+  });
+}
+
 const r2Columns: DataTableColumns<any> = [
   {
     title: '名称', key: 'name', ellipsis: { tooltip: true },
@@ -890,7 +958,7 @@ const r2Columns: DataTableColumns<any> = [
   { title: '大小', key: 'size', width: 100, render: (row: any) => row.isFolder ? '-' : formatSize(row.size) },
   { title: '修改时间', key: 'lastModified', width: 180, render: (row: any) => row.lastModified ? new Date(row.lastModified).toLocaleString() : '-' },
   {
-    title: '操作', key: 'actions', width: 180,
+    title: '操作', key: 'actions', width: 220,
     render: (row: any) => {
       if (row.isFolder) return null;
       const btns: any[] = [];
@@ -898,6 +966,7 @@ const r2Columns: DataTableColumns<any> = [
         btns.push(h(NButton, { size: 'small', type: 'info', onClick: () => handlePreviewR2(row) }, { default: () => '预览' }));
       }
       btns.push(h(NButton, { size: 'small', onClick: () => handleDownloadR2(row) }, { default: () => '下载' }));
+      btns.push(h(NButton, { size: 'small', type: 'warning', onClick: () => handleCopyR2Link(row) }, { default: () => '直链' }));
       btns.push(h(NButton, { size: 'small', type: 'error', onClick: () => handleDeleteR2(row) }, { default: () => '删除' }));
       return h(NSpace, { size: 'small' }, { default: () => btns });
     },
