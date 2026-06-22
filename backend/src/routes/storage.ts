@@ -6,7 +6,7 @@ import {
   createKvNamespace, deleteKvNamespace, listKvKeys, getKvValue, putKvValue, deleteKvKey, bulkDeleteKvKeys,
   createD1Database, deleteD1Database, listD1Tables, getD1TableSchema, executeD1Query,
   createR2Bucket, deleteR2Bucket, listR2Objects, getR2Object, putR2Object, deleteR2Object, bulkDeleteR2Objects,
-  listR2CustomDomains, listR2ManagedDomain,
+  listR2CustomDomains, listR2ManagedDomain, updateR2ManagedDomain, createR2CustomDomain, deleteR2CustomDomain, updateR2CustomDomain,
 } from '../services/storageService';
 import { listKvNamespaces, listD1Databases, listR2Buckets } from '../services/workerService';
 
@@ -347,6 +347,56 @@ router.get('/:accountId/r2/:bucket/domains', async (req: Request, res: Response,
       managed_domain: managedDomain,
       custom_domains: customDomains,
     });
+  } catch (err) { next(err); }
+});
+
+// Enable/disable r2.dev managed domain public access
+router.put('/:accountId/r2/:bucket/domains/managed', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const account = getAccountOr404(req, res);
+    if (!account) return;
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'enabled (boolean) is required' } }); return; }
+    const result = await updateR2ManagedDomain(account, p(req, 'bucket'), enabled);
+    createAuditLog(account.id, 'r2_managed_domain', p(req, 'bucket'), `enabled=${enabled}`, 'success');
+    res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Attach custom domain to R2 bucket
+router.post('/:accountId/r2/:bucket/domains/custom', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const account = getAccountOr404(req, res);
+    if (!account) return;
+    const { domain, zoneId, enabled } = req.body;
+    if (!domain) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'domain is required' } }); return; }
+    if (!zoneId) { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'zoneId is required' } }); return; }
+    const result = await createR2CustomDomain(account, p(req, 'bucket'), domain, zoneId, enabled);
+    createAuditLog(account.id, 'r2_add_custom_domain', p(req, 'bucket'), domain, 'success');
+    res.status(201).json(result);
+  } catch (err) { next(err); }
+});
+
+// Remove custom domain from R2 bucket
+router.delete('/:accountId/r2/:bucket/domains/custom/:domain', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const account = getAccountOr404(req, res);
+    if (!account) return;
+    await deleteR2CustomDomain(account, p(req, 'bucket'), decodeURIComponent(p(req, 'domain')));
+    createAuditLog(account.id, 'r2_remove_custom_domain', p(req, 'bucket'), decodeURIComponent(p(req, 'domain')), 'success');
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
+// Update custom domain settings (enable/disable)
+router.put('/:accountId/r2/:bucket/domains/custom/:domain', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const account = getAccountOr404(req, res);
+    if (!account) return;
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') { res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'enabled (boolean) is required' } }); return; }
+    const result = await updateR2CustomDomain(account, p(req, 'bucket'), decodeURIComponent(p(req, 'domain')), enabled);
+    res.json(result);
   } catch (err) { next(err); }
 });
 

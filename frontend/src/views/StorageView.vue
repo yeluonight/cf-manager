@@ -112,6 +112,7 @@
                     :style="{ background: selectedR2Bucket?.name === b.name ? 'rgba(24,160,88,0.1)' : '' }">
                     <div style="display: flex; justify-content: space-between; align-items: center">
                       <span style="cursor: pointer; flex: 1" @click="selectR2Bucket(b)">{{ b.name }}</span>
+                      <n-button size="tiny" quaternary @click.stop="openR2BucketSettings(b)" title="桶设置">⚙</n-button>
                       <n-button size="tiny" type="error" quaternary @click.stop="handleDeleteR2Bucket(b)">×</n-button>
                     </div>
                   </n-list-item>
@@ -253,6 +254,78 @@
       </template>
     </n-modal>
 
+    <!-- R2 Bucket Settings Modal -->
+    <n-modal v-model:show="showR2Settings" preset="card" :title="`桶设置 - ${r2SettingsBucket?.name || ''}`" style="width: 650px; max-width: 95vw">
+      <n-spin :show="r2SettingsLoading">
+        <n-tabs type="line" size="small">
+          <n-tab-pane name="access" tab="公开访问">
+            <n-space vertical>
+              <n-card size="small" title="R2.dev 域名">
+                <n-spin :show="r2ManagedLoading">
+                  <n-space vertical v-if="r2ManagedInfo">
+                    <n-space align="center">
+                      <n-text style="font-size: 13px">{{ r2ManagedInfo.domain }}</n-text>
+                      <n-tag v-if="r2ManagedInfo.enabled" type="success" size="small">已启用</n-tag>
+                      <n-tag v-else type="warning" size="small">未启用</n-tag>
+                    </n-space>
+                    <n-space align="center">
+                      <n-text style="font-size: 12px">公开访问：</n-text>
+                      <n-switch :value="r2ManagedInfo.enabled" :loading="r2ManagedSaving"
+                        @update:value="toggleR2ManagedDomain" />
+                    </n-space>
+                    <n-text v-if="r2ManagedInfo.enabled" depth="3" style="font-size: 11px">
+                      URL 格式：https://{{ r2ManagedInfo.domain }}/<key>
+                    </n-text>
+                    <n-text v-else depth="3" style="font-size: 11px">
+                      启用后可通过此域名公开访问桶内文件（仅限开发用途，有速率限制）
+                    </n-text>
+                  </n-space>
+                  <n-empty v-else description="无法获取 R2.dev 域名信息" size="small" />
+                </n-spin>
+              </n-card>
+              <n-card size="small" title="S3 公开访问 URL">
+                <n-text v-if="r2SettingsS3Url" style="font-size: 12px; word-break: break-all">{{ r2SettingsS3Url }}/<key></n-text>
+                <n-text v-else depth="3" style="font-size: 12px">需启用 R2.dev 或自定义域名后可用</n-text>
+              </n-card>
+            </n-space>
+          </n-tab-pane>
+          <n-tab-pane name="custom-domains" tab="自定义域名">
+            <n-space vertical>
+              <n-space justify="space-between" align="center">
+                <n-text depth="3" style="font-size: 12px">绑定自定义域名到 R2 存储桶，生产环境推荐使用自定义域名</n-text>
+                <n-button size="small" type="primary" @click="showR2AddDomain = true">添加域名</n-button>
+              </n-space>
+              <n-spin :show="r2CustomLoading">
+                <n-data-table :columns="r2CustomDomainColumns" :data="r2CustomDomains" :bordered="false" size="small" :scroll-x="500" />
+                <n-empty v-if="!r2CustomDomains.length && !r2CustomLoading" description="暂无自定义域名" size="small" style="margin-top: 12px" />
+              </n-spin>
+            </n-space>
+          </n-tab-pane>
+        </n-tabs>
+      </n-spin>
+      <template #footer>
+        <n-space justify="end">
+          <n-button size="small" @click="showR2Settings = false">关闭</n-button>
+        </n-space>
+      </template>
+    </n-modal>
+
+    <!-- R2 Add Custom Domain Modal -->
+    <n-modal v-model:show="showR2AddDomain" preset="dialog" title="添加自定义域名" style="width: 480px; max-width: 95vw">
+      <n-form label-placement="left" label-width="80">
+        <n-form-item label="域名">
+          <n-input v-model:value="r2AddDomainForm.domain" placeholder="例: cdn.example.com" />
+        </n-form-item>
+        <n-form-item label="Zone ID">
+          <n-input v-model:value="r2AddDomainForm.zoneId" placeholder="域名所属 Zone ID" />
+        </n-form-item>
+      </n-form>
+      <template #action>
+        <n-button @click="showR2AddDomain = false">取消</n-button>
+        <n-button type="primary" :loading="r2AddDomainSaving" @click="handleR2AddCustomDomain" :disabled="!r2AddDomainForm.domain || !r2AddDomainForm.zoneId">添加</n-button>
+      </template>
+    </n-modal>
+
     <!-- R2 Image Preview Modal -->
     <n-modal v-model:show="showR2Preview" preset="card" :title="r2PreviewName" style="width: 80vw; max-width: 900px">
       <div style="text-align: center">
@@ -297,7 +370,7 @@
 
 <script setup lang="ts">
 import { ref, computed, h, onMounted, watch } from 'vue';
-import { NButton, NSpace, NInput, NSelect, NCheckbox, useMessage, useDialog } from 'naive-ui';
+import { NButton, NSpace, NInput, NSelect, NCheckbox, NSwitch, NTag, useMessage, useDialog } from 'naive-ui';
 import type { DataTableColumns } from 'naive-ui';
 import { storageApi } from '../api/storage';
 import { useAccountStore } from '../stores/accountStore';
@@ -941,12 +1014,152 @@ async function handleCopyR2Link(row: any) {
 }
 
 function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text).then(() => {
-    message.success('已复制到剪贴板');
-  }).catch(() => {
-    message.error('复制失败');
-  });
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(() => {
+      message.success('已复制到剪贴板');
+    }).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
 }
+
+function fallbackCopy(text: string) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand('copy');
+    message.success('已复制到剪贴板');
+  } catch {
+    message.error('复制失败');
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
+// ============ R2 Bucket Settings ============
+const showR2Settings = ref(false);
+const r2SettingsBucket = ref<any>(null);
+const r2SettingsLoading = ref(false);
+const r2ManagedInfo = ref<{ domain: string; enabled: boolean } | null>(null);
+const r2ManagedLoading = ref(false);
+const r2ManagedSaving = ref(false);
+const r2SettingsS3Url = ref<string | null>(null);
+const r2CustomDomains = ref<any[]>([]);
+const r2CustomLoading = ref(false);
+
+async function openR2BucketSettings(b: any) {
+  if (!selectedAccount.value) return;
+  r2SettingsBucket.value = b;
+  showR2Settings.value = true;
+  r2SettingsLoading.value = true;
+  r2ManagedInfo.value = null;
+  r2CustomDomains.value = [];
+  r2SettingsS3Url.value = null;
+  try {
+    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, b.name);
+    r2ManagedInfo.value = data.managed_domain || null;
+    r2CustomDomains.value = data.custom_domains || [];
+    r2SettingsS3Url.value = data.s3_public_url || null;
+  } catch {
+    message.error('获取桶域名信息失败');
+  } finally {
+    r2SettingsLoading.value = false;
+  }
+}
+
+async function toggleR2ManagedDomain(enabled: boolean) {
+  if (!selectedAccount.value || !r2SettingsBucket.value) return;
+  r2ManagedSaving.value = true;
+  try {
+    await storageApi.updateR2ManagedDomain(selectedAccount.value, r2SettingsBucket.value.name, enabled);
+    message.success(enabled ? 'R2.dev 公开访问已开启' : 'R2.dev 公开访问已关闭');
+    r2ManagedInfo.value = { ...r2ManagedInfo.value!, enabled };
+    // Update S3 URL availability
+    const hasPublic = enabled || r2CustomDomains.value.some((d: any) => d.enabled && d.ownership === 'active');
+    const acct = accountStore.accounts.find((a: any) => a.id === selectedAccount.value);
+    r2SettingsS3Url.value = hasPublic ? `https://${acct?.account_id}.r2.cloudflarestorage.com/${r2SettingsBucket.value.name}` : null;
+  } catch {
+    message.error('操作失败');
+  } finally {
+    r2ManagedSaving.value = false;
+  }
+}
+
+const showR2AddDomain = ref(false);
+const r2AddDomainForm = ref({ domain: '', zoneId: '' });
+const r2AddDomainSaving = ref(false);
+
+async function handleR2AddCustomDomain() {
+  if (!selectedAccount.value || !r2SettingsBucket.value) return;
+  r2AddDomainSaving.value = true;
+  try {
+    await storageApi.createR2CustomDomain(selectedAccount.value, r2SettingsBucket.value.name, r2AddDomainForm.value.domain, r2AddDomainForm.value.zoneId);
+    message.success('自定义域名已绑定');
+    showR2AddDomain.value = false;
+    r2AddDomainForm.value = { domain: '', zoneId: '' };
+    // Reload domains
+    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, r2SettingsBucket.value.name);
+    r2CustomDomains.value = data.custom_domains || [];
+    r2SettingsS3Url.value = data.s3_public_url || null;
+    r2ManagedInfo.value = data.managed_domain || null;
+  } catch {
+    message.error('绑定域名失败');
+  } finally {
+    r2AddDomainSaving.value = false;
+  }
+}
+
+async function handleR2DeleteCustomDomain(domain: string) {
+  if (!selectedAccount.value || !r2SettingsBucket.value) return;
+  if (!await confirmAction('解绑域名', `确定解绑自定义域名 "${domain}" 吗？`)) return;
+  try {
+    await storageApi.deleteR2CustomDomain(selectedAccount.value, r2SettingsBucket.value.name, domain);
+    message.success('域名已解绑');
+    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, r2SettingsBucket.value.name);
+    r2CustomDomains.value = data.custom_domains || [];
+    r2SettingsS3Url.value = data.s3_public_url || null;
+  } catch {
+    message.error('解绑失败');
+  }
+}
+
+async function handleR2ToggleCustomDomain(domain: string, enabled: boolean) {
+  if (!selectedAccount.value || !r2SettingsBucket.value) return;
+  try {
+    await storageApi.updateR2CustomDomain(selectedAccount.value, r2SettingsBucket.value.name, domain, enabled);
+    message.success(enabled ? '域名已启用' : '域名已禁用');
+    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, r2SettingsBucket.value.name);
+    r2CustomDomains.value = data.custom_domains || [];
+    r2SettingsS3Url.value = data.s3_public_url || null;
+  } catch {
+    message.error('操作失败');
+  }
+}
+
+const r2CustomDomainColumns: DataTableColumns<any> = [
+  { title: '域名', key: 'domain', ellipsis: { tooltip: true } },
+  {
+    title: '状态', key: 'status', width: 120,
+    render: (row) => h(NSpace, { size: 'small' }, { default: () => [
+      h(NTag, { size: 'small', type: row.ownership === 'active' ? 'success' : 'warning' }, { default: () => row.ownership }),
+      h(NTag, { size: 'small', type: row.ssl === 'active' ? 'success' : 'warning' }, { default: () => row.ssl }),
+    ]}),
+  },
+  {
+    title: '启用', key: 'enabled', width: 70,
+    render: (row) => h(NSwitch, { value: row.enabled, size: 'small', onUpdateValue: (v: boolean) => handleR2ToggleCustomDomain(row.domain, v) }),
+  },
+  {
+    title: '操作', key: 'actions', width: 70,
+    render: (row) => h(NButton, { size: 'small', type: 'error', onClick: () => handleR2DeleteCustomDomain(row.domain) }, { default: () => '解绑' }),
+  },
+];
 
 const r2Columns: DataTableColumns<any> = [
   {

@@ -47,6 +47,14 @@ export const storageApi = {
     apiClient.post(`/storage/${accountId}/r2/${bucket}/bulk-delete`, { keys }),
   getR2BucketDomains: (accountId: number, bucket: string) =>
     apiClient.get(`/storage/${accountId}/r2/${bucket}/domains`),
+  updateR2ManagedDomain: (accountId: number, bucket: string, enabled: boolean) =>
+    apiClient.put(`/storage/${accountId}/r2/${bucket}/domains/managed`, { enabled }),
+  createR2CustomDomain: (accountId: number, bucket: string, domain: string, zoneId: string) =>
+    apiClient.post(`/storage/${accountId}/r2/${bucket}/domains/custom`, { domain, zoneId }),
+  deleteR2CustomDomain: (accountId: number, bucket: string, domain: string) =>
+    apiClient.delete(`/storage/${accountId}/r2/${bucket}/domains/custom/${encodeURIComponent(domain)}`),
+  updateR2CustomDomain: (accountId: number, bucket: string, domain: string, enabled: boolean) =>
+    apiClient.put(`/storage/${accountId}/r2/${bucket}/domains/custom/${encodeURIComponent(domain)}`, { enabled }),
 };
 
 export const tasksApi = {

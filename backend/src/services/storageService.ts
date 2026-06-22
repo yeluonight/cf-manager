@@ -168,3 +168,25 @@ export async function listR2ManagedDomain(account: Account, bucketName: string):
   const cf = getCfClient(account);
   return cf.r2.buckets.domains.managed.list(bucketName, { account_id: acctId(account) });
 }
+
+export async function updateR2ManagedDomain(account: Account, bucketName: string, enabled: boolean): Promise<any> {
+  const cf = getCfClient(account);
+  return cf.r2.buckets.domains.managed.update(bucketName, { account_id: acctId(account), enabled });
+}
+
+export async function createR2CustomDomain(account: Account, bucketName: string, domain: string, zoneId: string, enabled?: boolean): Promise<any> {
+  const cf = getCfClient(account);
+  return cf.r2.buckets.domains.custom.create(bucketName, {
+    account_id: acctId(account), domain, enabled: enabled ?? true, zoneId,
+  });
+}
+
+export async function deleteR2CustomDomain(account: Account, bucketName: string, domain: string): Promise<void> {
+  const cf = getCfClient(account);
+  await cf.r2.buckets.domains.custom.delete(bucketName, domain, { account_id: acctId(account) });
+}
+
+export async function updateR2CustomDomain(account: Account, bucketName: string, domain: string, enabled: boolean): Promise<any> {
+  const cf = getCfClient(account);
+  return cf.r2.buckets.domains.custom.update(bucketName, domain, { account_id: acctId(account), enabled });
+}
