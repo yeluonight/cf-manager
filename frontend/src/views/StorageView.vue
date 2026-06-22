@@ -274,7 +274,7 @@
                         @update:value="toggleR2ManagedDomain" />
                     </n-space>
                     <n-text v-if="r2ManagedInfo.enabled" depth="3" style="font-size: 11px">
-                      URL 格式：https://{{ r2ManagedInfo.domain }}/<key>
+                      URL 格式：https://{{ r2ManagedInfo.domain }}/&lt;key&gt;
                     </n-text>
                     <n-text v-else depth="3" style="font-size: 11px">
                       启用后可通过此域名公开访问桶内文件（仅限开发用途，有速率限制）
@@ -284,7 +284,7 @@
                 </n-spin>
               </n-card>
               <n-card size="small" title="S3 公开访问 URL">
-                <n-text v-if="r2SettingsS3Url" style="font-size: 12px; word-break: break-all">{{ r2SettingsS3Url }}/<key></n-text>
+                <n-text v-if="r2SettingsS3Url" style="font-size: 12px; word-break: break-all">{{ r2SettingsS3Url }}/&lt;key&gt;</n-text>
                 <n-text v-else depth="3" style="font-size: 12px">需启用 R2.dev 或自定义域名后可用</n-text>
               </n-card>
             </n-space>
