@@ -273,9 +273,12 @@
         <div v-if="r2LinkKey" style="margin-bottom: 12px">
           <n-text depth="3" style="font-size: 12px">文件：{{ r2LinkKey }}</n-text>
         </div>
-        <n-empty v-if="!r2LinkLoading && !r2LinkUrls.length" description="无可用的公开访问域名（需开启桶的公开访问或配置自定义域名）" />
+        <n-empty v-if="!r2LinkLoading && !r2LinkUrls.length" description="无可用的公开访问域名（需在 Cloudflare 控制台开启桶的公开访问或配置自定义域名）" />
         <div v-for="item in r2LinkUrls" :key="item.url" style="margin-bottom: 10px">
-          <n-text style="font-size: 12px; display: block; margin-bottom: 2px">{{ item.label }}</n-text>
+          <n-space align="center" style="margin-bottom: 2px">
+            <n-text style="font-size: 12px">{{ item.label }}</n-text>
+            <n-text v-if="item.note" type="warning" style="font-size: 11px">{{ item.note }}</n-text>
+          </n-space>
           <n-input :value="item.url" size="small" readonly>
             <template #suffix>
               <n-button size="tiny" type="primary" quaternary @click="copyToClipboard(item.url)">复制</n-button>
@@ -900,7 +903,7 @@ async function handleDownloadR2(row: any) {
 const showR2LinkModal = ref(false);
 const r2LinkLoading = ref(false);
 const r2LinkKey = ref('');
-const r2LinkUrls = ref<{ label: string; url: string }[]>([]);
+const r2LinkUrls = ref<{ label: string; url: string; note?: string }[]>([]);
 
 async function handleCopyR2Link(row: any) {
   if (!selectedAccount.value || !selectedR2Bucket.value) return;
@@ -910,19 +913,23 @@ async function handleCopyR2Link(row: any) {
   r2LinkUrls.value = [];
   try {
     const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, selectedR2Bucket.value.name);
-    const urls: { label: string; url: string }[] = [];
-    // S3 public URL
+    const urls: { label: string; url: string; note?: string }[] = [];
+    // S3 public access URL (only when bucket has public access enabled)
+    // Format: https://<account_id>.r2.cloudflarestorage.com/<bucket>/<key>
     if (data.s3_public_url) {
       urls.push({ label: 'S3 公开访问', url: `${data.s3_public_url}/${row.key}` });
     }
     // R2.dev managed domain
     if (data.managed_domain) {
-      urls.push({ label: 'R2.dev 域名', url: `https://${data.managed_domain}/${row.key}` });
+      const md = data.managed_domain;
+      const note = md.enabled ? undefined : '（未启用公开访问）';
+      urls.push({ label: 'R2.dev 域名', url: `https://${md.domain}/${row.key}`, note });
     }
     // Custom domains
     if (data.custom_domains?.length) {
       for (const d of data.custom_domains) {
-        urls.push({ label: `自定义域名 (${d.domain})`, url: `https://${d.domain}/${row.key}` });
+        const note = (d.enabled && d.ownership === 'active') ? undefined : `（${d.ownership}/${d.ssl}）`;
+        urls.push({ label: `自定义域名 (${d.domain})`, url: `https://${d.domain}/${row.key}`, note });
       }
     }
     r2LinkUrls.value = urls;

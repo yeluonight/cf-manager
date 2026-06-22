@@ -308,7 +308,7 @@ router.post('/:accountId/r2/:bucket/bulk-delete', async (req: Request, res: Resp
   } catch (err) { next(err); }
 });
 
-// R2 Bucket Domains (custom + managed + S3 public URL)
+// R2 Bucket Domains (S3 public + r2.dev managed + custom domains)
 router.get('/:accountId/r2/:bucket/domains', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const account = getAccountOr404(req, res);
@@ -320,24 +320,32 @@ router.get('/:accountId/r2/:bucket/domains', async (req: Request, res: Response,
       listR2ManagedDomain(account, bucketName),
     ]);
 
+    // Custom domains — return all with status info
     const customDomains = customResult.status === 'fulfilled'
-      ? (customResult.value?.domains || []).filter((d: any) => d.enabled && d.status?.ownership === 'active')
+      ? (customResult.value?.domains || []).map((d: any) => ({
+          domain: d.domain,
+          enabled: d.enabled,
+          ownership: d.status?.ownership || 'unknown',
+          ssl: d.status?.ssl || 'unknown',
+        }))
       : [];
-    const managedDomain = managedResult.status === 'fulfilled' && managedResult.value?.enabled
-      ? managedResult.value.domain
+
+    // Managed r2.dev domain — return if present with enabled status
+    const managedDomain = managedResult.status === 'fulfilled' && managedResult.value?.domain
+      ? { domain: managedResult.value.domain, enabled: !!managedResult.value.enabled }
       : null;
 
-    // S3 public access URL (always constructable)
-    const s3Url = `https://${bucketName}.${account.account_id}.r2.cloudflarestorage.com`;
+    // S3 public access URL — only meaningful when bucket has public access enabled
+    // Correct format: https://<account_id>.r2.cloudflarestorage.com/<bucket>/<key>
+    const hasPublicAccess = (managedDomain?.enabled) || customDomains.some((d: any) => d.enabled && d.ownership === 'active');
+    const s3PublicUrl = hasPublicAccess
+      ? `https://${account.account_id}.r2.cloudflarestorage.com/${bucketName}`
+      : null;
 
     res.json({
-      s3_public_url: s3Url,
+      s3_public_url: s3PublicUrl,
       managed_domain: managedDomain,
-      custom_domains: customDomains.map((d: any) => ({
-        domain: d.domain,
-        enabled: d.enabled,
-        status: d.status,
-      })),
+      custom_domains: customDomains,
     });
   } catch (err) { next(err); }
 });
