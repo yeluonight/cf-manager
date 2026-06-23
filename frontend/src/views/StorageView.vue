@@ -283,17 +283,13 @@
                   <n-empty v-else description="无法获取 R2.dev 域名信息" size="small" />
                 </n-spin>
               </n-card>
-              <n-card size="small" title="S3 公开访问 URL">
-                <n-text v-if="r2SettingsS3Url" style="font-size: 12px; word-break: break-all">{{ r2SettingsS3Url }}/&lt;key&gt;</n-text>
-                <n-text v-else depth="3" style="font-size: 12px">需启用 R2.dev 或自定义域名后可用</n-text>
-              </n-card>
             </n-space>
           </n-tab-pane>
           <n-tab-pane name="custom-domains" tab="自定义域名">
             <n-space vertical>
               <n-space justify="space-between" align="center">
                 <n-text depth="3" style="font-size: 12px">绑定自定义域名到 R2 存储桶，生产环境推荐使用自定义域名</n-text>
-                <n-button size="small" type="primary" @click="showR2AddDomain = true">添加域名</n-button>
+                <n-button size="small" type="primary" @click="showR2AddDomain = true; loadR2Zones()">添加域名</n-button>
               </n-space>
               <n-spin :show="r2CustomLoading">
                 <n-data-table :columns="r2CustomDomainColumns" :data="r2CustomDomains" :bordered="false" size="small" :scroll-x="500" />
@@ -314,15 +310,20 @@
     <n-modal v-model:show="showR2AddDomain" preset="dialog" title="添加自定义域名" style="width: 480px; max-width: 95vw">
       <n-form label-placement="left" label-width="80">
         <n-form-item label="域名">
-          <n-input v-model:value="r2AddDomainForm.domain" placeholder="例: cdn.example.com" />
+          <n-select v-model:value="r2AddDomainForm.zoneId" :options="r2ZoneOptions" placeholder="选择域名"
+            filterable size="small" :loading="r2ZonesLoading" @update:value="onZoneSelected" />
         </n-form-item>
-        <n-form-item label="Zone ID">
-          <n-input v-model:value="r2AddDomainForm.zoneId" placeholder="域名所属 Zone ID" />
+        <n-form-item v-if="r2AddDomainForm.zoneId" label="子域名">
+          <n-input v-model:value="r2AddDomainForm.subdomain" placeholder="例: cdn 或留空使用根域名">
+            <template #suffix>
+              <n-text depth="3">.{{ r2SelectedZoneName }}</n-text>
+            </template>
+          </n-input>
         </n-form-item>
       </n-form>
       <template #action>
         <n-button @click="showR2AddDomain = false">取消</n-button>
-        <n-button type="primary" :loading="r2AddDomainSaving" @click="handleR2AddCustomDomain" :disabled="!r2AddDomainForm.domain || !r2AddDomainForm.zoneId">添加</n-button>
+        <n-button type="primary" :loading="r2AddDomainSaving" @click="handleR2AddCustomDomain" :disabled="!r2AddDomainForm.zoneId">添加</n-button>
       </template>
     </n-modal>
 
@@ -987,11 +988,6 @@ async function handleCopyR2Link(row: any) {
   try {
     const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, selectedR2Bucket.value.name);
     const urls: { label: string; url: string; note?: string }[] = [];
-    // S3 public access URL (only when bucket has public access enabled)
-    // Format: https://<account_id>.r2.cloudflarestorage.com/<bucket>/<key>
-    if (data.s3_public_url) {
-      urls.push({ label: 'S3 公开访问', url: `${data.s3_public_url}/${row.key}` });
-    }
     // R2.dev managed domain
     if (data.managed_domain) {
       const md = data.managed_domain;
@@ -1049,7 +1045,6 @@ const r2SettingsLoading = ref(false);
 const r2ManagedInfo = ref<{ domain: string; enabled: boolean } | null>(null);
 const r2ManagedLoading = ref(false);
 const r2ManagedSaving = ref(false);
-const r2SettingsS3Url = ref<string | null>(null);
 const r2CustomDomains = ref<any[]>([]);
 const r2CustomLoading = ref(false);
 
@@ -1060,12 +1055,10 @@ async function openR2BucketSettings(b: any) {
   r2SettingsLoading.value = true;
   r2ManagedInfo.value = null;
   r2CustomDomains.value = [];
-  r2SettingsS3Url.value = null;
   try {
     const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, b.name);
     r2ManagedInfo.value = data.managed_domain || null;
     r2CustomDomains.value = data.custom_domains || [];
-    r2SettingsS3Url.value = data.s3_public_url || null;
   } catch {
     message.error('获取桶域名信息失败');
   } finally {
@@ -1080,10 +1073,6 @@ async function toggleR2ManagedDomain(enabled: boolean) {
     await storageApi.updateR2ManagedDomain(selectedAccount.value, r2SettingsBucket.value.name, enabled);
     message.success(enabled ? 'R2.dev 公开访问已开启' : 'R2.dev 公开访问已关闭');
     r2ManagedInfo.value = { ...r2ManagedInfo.value!, enabled };
-    // Update S3 URL availability
-    const hasPublic = enabled || r2CustomDomains.value.some((d: any) => d.enabled && d.ownership === 'active');
-    const acct = accountStore.accounts.find((a: any) => a.id === selectedAccount.value);
-    r2SettingsS3Url.value = hasPublic ? `https://${acct?.account_id}.r2.cloudflarestorage.com/${r2SettingsBucket.value.name}` : null;
   } catch {
     message.error('操作失败');
   } finally {
@@ -1091,23 +1080,54 @@ async function toggleR2ManagedDomain(enabled: boolean) {
   }
 }
 
+async function reloadR2Domains() {
+  if (!selectedAccount.value || !r2SettingsBucket.value) return;
+  const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, r2SettingsBucket.value.name);
+  r2CustomDomains.value = data.custom_domains || [];
+  r2ManagedInfo.value = data.managed_domain || null;
+}
+
+// R2 zones for custom domain binding
+const r2Zones = ref<any[]>([]);
+const r2ZonesLoading = ref(false);
+const r2ZoneOptions = computed(() =>
+  r2Zones.value.map(z => ({ label: z.name, value: z.id }))
+);
+
+async function loadR2Zones() {
+  if (!selectedAccount.value) return;
+  r2ZonesLoading.value = true;
+  try {
+    const { data } = await storageApi.getZones(selectedAccount.value);
+    r2Zones.value = Array.isArray(data) ? data : [];
+  } catch { r2Zones.value = []; }
+  finally { r2ZonesLoading.value = false; }
+}
+
 const showR2AddDomain = ref(false);
-const r2AddDomainForm = ref({ domain: '', zoneId: '' });
+const r2AddDomainForm = ref({ zoneId: '', subdomain: '' });
 const r2AddDomainSaving = ref(false);
+const r2SelectedZoneName = computed(() => {
+  const zone = r2Zones.value.find(z => z.id === r2AddDomainForm.value.zoneId);
+  return zone?.name || '';
+});
+
+function onZoneSelected() {
+  r2AddDomainForm.value.subdomain = '';
+}
 
 async function handleR2AddCustomDomain() {
   if (!selectedAccount.value || !r2SettingsBucket.value) return;
+  const sub = r2AddDomainForm.value.subdomain?.trim();
+  const zoneName = r2SelectedZoneName.value;
+  const hostname = sub ? `${sub}.${zoneName}` : zoneName;
   r2AddDomainSaving.value = true;
   try {
-    await storageApi.createR2CustomDomain(selectedAccount.value, r2SettingsBucket.value.name, r2AddDomainForm.value.domain, r2AddDomainForm.value.zoneId);
+    await storageApi.createR2CustomDomain(selectedAccount.value, r2SettingsBucket.value.name, hostname, r2AddDomainForm.value.zoneId);
     message.success('自定义域名已绑定');
     showR2AddDomain.value = false;
-    r2AddDomainForm.value = { domain: '', zoneId: '' };
-    // Reload domains
-    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, r2SettingsBucket.value.name);
-    r2CustomDomains.value = data.custom_domains || [];
-    r2SettingsS3Url.value = data.s3_public_url || null;
-    r2ManagedInfo.value = data.managed_domain || null;
+    r2AddDomainForm.value = { zoneId: '', subdomain: '' };
+    await reloadR2Domains();
   } catch {
     message.error('绑定域名失败');
   } finally {
@@ -1121,9 +1141,7 @@ async function handleR2DeleteCustomDomain(domain: string) {
   try {
     await storageApi.deleteR2CustomDomain(selectedAccount.value, r2SettingsBucket.value.name, domain);
     message.success('域名已解绑');
-    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, r2SettingsBucket.value.name);
-    r2CustomDomains.value = data.custom_domains || [];
-    r2SettingsS3Url.value = data.s3_public_url || null;
+    await reloadR2Domains();
   } catch {
     message.error('解绑失败');
   }
@@ -1134,9 +1152,7 @@ async function handleR2ToggleCustomDomain(domain: string, enabled: boolean) {
   try {
     await storageApi.updateR2CustomDomain(selectedAccount.value, r2SettingsBucket.value.name, domain, enabled);
     message.success(enabled ? '域名已启用' : '域名已禁用');
-    const { data } = await storageApi.getR2BucketDomains(selectedAccount.value, r2SettingsBucket.value.name);
-    r2CustomDomains.value = data.custom_domains || [];
-    r2SettingsS3Url.value = data.s3_public_url || null;
+    await reloadR2Domains();
   } catch {
     message.error('操作失败');
   }

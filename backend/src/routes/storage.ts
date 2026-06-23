@@ -308,7 +308,7 @@ router.post('/:accountId/r2/:bucket/bulk-delete', async (req: Request, res: Resp
   } catch (err) { next(err); }
 });
 
-// R2 Bucket Domains (S3 public + r2.dev managed + custom domains)
+// R2 Bucket Domains (r2.dev managed + custom domains)
 router.get('/:accountId/r2/:bucket/domains', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const account = getAccountOr404(req, res);
@@ -335,15 +335,7 @@ router.get('/:accountId/r2/:bucket/domains', async (req: Request, res: Response,
       ? { domain: managedResult.value.domain, enabled: !!managedResult.value.enabled }
       : null;
 
-    // S3 public access URL — only meaningful when bucket has public access enabled
-    // Correct format: https://<account_id>.r2.cloudflarestorage.com/<bucket>/<key>
-    const hasPublicAccess = (managedDomain?.enabled) || customDomains.some((d: any) => d.enabled && d.ownership === 'active');
-    const s3PublicUrl = hasPublicAccess
-      ? `https://${account.account_id}.r2.cloudflarestorage.com/${bucketName}`
-      : null;
-
     res.json({
-      s3_public_url: s3PublicUrl,
       managed_domain: managedDomain,
       custom_domains: customDomains,
     });

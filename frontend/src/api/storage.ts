@@ -55,6 +55,8 @@ export const storageApi = {
     apiClient.delete(`/storage/${accountId}/r2/${bucket}/domains/custom/${encodeURIComponent(domain)}`),
   updateR2CustomDomain: (accountId: number, bucket: string, domain: string, enabled: boolean) =>
     apiClient.put(`/storage/${accountId}/r2/${bucket}/domains/custom/${encodeURIComponent(domain)}`, { enabled }),
+  getZones: (accountId: number) =>
+    apiClient.get(`/workers/${accountId}/resources/zones`, { timeout: 60000 }),
 };
 
 export const tasksApi = {
